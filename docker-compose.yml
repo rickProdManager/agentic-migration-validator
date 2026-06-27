@@ -1,0 +1,40 @@
+services:
+  source-postgres:
+    image: postgres:16-alpine
+    container_name: agentic-migration-source-postgres
+    environment:
+      POSTGRES_DB: migration_validator
+      POSTGRES_USER: validator_admin
+      POSTGRES_PASSWORD: validator_admin
+    ports:
+      - "55432:5432"
+    volumes:
+      - source-postgres-data:/var/lib/postgresql/data
+      - ./fixtures:/fixtures:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U validator_admin -d migration_validator"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  target-postgres:
+    image: postgres:16-alpine
+    container_name: agentic-migration-target-postgres
+    environment:
+      POSTGRES_DB: migration_validator
+      POSTGRES_USER: validator_admin
+      POSTGRES_PASSWORD: validator_admin
+    ports:
+      - "55433:5432"
+    volumes:
+      - target-postgres-data:/var/lib/postgresql/data
+      - ./fixtures:/fixtures:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U validator_admin -d migration_validator"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  source-postgres-data:
+  target-postgres-data:

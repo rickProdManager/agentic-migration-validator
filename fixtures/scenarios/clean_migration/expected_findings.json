@@ -1,0 +1,6 @@
+{
+  "scenario_id": "clean_migration",
+  "model_calls": "disabled",
+  "expected_findings": [],
+  "allowed_extra_findings": []
+}

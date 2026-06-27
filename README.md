@@ -6,22 +6,23 @@ The core product idea is simple: advisors propose, deterministic invariants disp
 
 ## Current Status
 
-This repo is in Day 1 foundation work. The product requirements and architecture contracts are drafted, and the first implemented technical slice is deterministic risk scoring.
+This repo is in early Day 2 work. The product requirements and architecture contracts are drafted, deterministic risk scoring is implemented, checksum canonicalization is implemented, and the first PostgreSQL fixture environment is available.
 
 Implemented today:
 
 - Axis-aware risk scoring in `tools/risk_scoring.py`
+- Canonical row and table checksums in `tools/checksum.py`
 - Risk scoring test vectors in `docs/risk-scoring-test-vectors.md`
-- Unit tests in `tests/test_risk_scoring.py`
+- Unit tests in `tests/`
 - Foundation specs for architecture, findings, evidence references, gatekeeper invariants, fixtures, artifacts, audit events, and the initial API
+- Docker Compose fixture databases for `source-postgres` and `target-postgres`
+- Seed fixtures for `clean_migration` and `failed_checksum`
 
 Not implemented yet:
 
-- Docker-managed PostgreSQL source and target databases
-- Fixture seed scripts
 - Database introspection
 - Schema diffing
-- Data validation and checksum tooling
+- Data validation detector tooling
 - Workflow orchestration
 - FastAPI backend
 - Vite React dashboard
@@ -55,9 +56,17 @@ docs/
   risk-scoring-test-vectors.md
   structured-finding-schema.md
 tests/
+  test_checksum.py
   test_risk_scoring.py
 tools/
+  checksum.py
   risk_scoring.py
+fixtures/
+  base/
+  scenarios/
+scripts/
+  reset_databases.sh
+docker-compose.yml
 Makefile
 pyproject.toml
 ```
@@ -90,16 +99,37 @@ Equivalent direct command:
 python3 -m pytest -q
 ```
 
+Start the fixture databases:
+
+```sh
+make db-up
+```
+
+Load the clean scenario:
+
+```sh
+make db-reset
+```
+
+Load the failed-checksum scenario:
+
+```sh
+make db-reset SCENARIO=failed_checksum
+```
+
+Stop the fixture databases:
+
+```sh
+make db-down
+```
+
 ## Next Milestone
 
-Day 2 should start the deterministic database foundation:
+Day 2 should continue the deterministic database foundation:
 
-- Add Docker Compose for `source-postgres` and `target-postgres`
-- Add baseline fixture schema and seed data
-- Add read-only database roles
-- Define scenario descriptors and expected findings
 - Implement initial database introspection
 - Begin row count and schema comparison detectors
+- Wire table checksum comparison to the fixture scenarios
 
 ## Design Boundary
 

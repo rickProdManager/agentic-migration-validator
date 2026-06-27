@@ -1,0 +1,23 @@
+{
+  "scenario_id": "failed_checksum",
+  "model_calls": "disabled",
+  "expected_findings": [
+    {
+      "record_type": "detector_finding",
+      "risk_axis": "migration_integrity",
+      "finding_key": "validation.checksum_mismatch:public.customers:*",
+      "finding_type": "validation.checksum_mismatch",
+      "detector": "canonical_checksum",
+      "severity": "high",
+      "scope": {
+        "schema": "public",
+        "table": "customers",
+        "column": null,
+        "constraint": null,
+        "business_key": null
+      },
+      "expected_gate_effect": ["blocks_cutover", "blocks_ready"]
+    }
+  ],
+  "allowed_extra_findings": []
+}

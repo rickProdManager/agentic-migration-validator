@@ -1,0 +1,14 @@
+{
+  "scenario_id": "failed_checksum",
+  "description": "Target row counts and schemas match source, but a customer content value differs.",
+  "source_seed": "fixtures/base/source.sql",
+  "target_seed": "fixtures/scenarios/failed_checksum/target.sql",
+  "critical_tables": ["customers", "orders", "payments"],
+  "business_keys": {
+    "customers": ["email"],
+    "orders": ["order_number"],
+    "payments": ["payment_reference"]
+  },
+  "allowed_lag": null,
+  "expected_results": "fixtures/scenarios/failed_checksum/expected_findings.json"
+}

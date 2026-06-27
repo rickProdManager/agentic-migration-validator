@@ -1,0 +1,14 @@
+{
+  "scenario_id": "clean_migration",
+  "description": "Source and target use identical baseline seed data and should produce no migration-integrity findings.",
+  "source_seed": "fixtures/base/source.sql",
+  "target_seed": "fixtures/base/target.sql",
+  "critical_tables": ["customers", "orders", "payments"],
+  "business_keys": {
+    "customers": ["email"],
+    "orders": ["order_number"],
+    "payments": ["payment_reference"]
+  },
+  "allowed_lag": null,
+  "expected_results": "fixtures/scenarios/clean_migration/expected_findings.json"
+}

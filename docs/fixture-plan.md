@@ -74,12 +74,12 @@ Each scenario should have a JSON or YAML descriptor:
 - Compatibility advisory findings may appear in clean scenarios, but they must be listed as expected or allowed extras.
 - Expected results must use stable `finding_key` values.
 
-## Proposed Directory Layout
+## Implemented Directory Layout
 
 ```text
 fixtures/
-  compose.yml
   base/
+    common.sql
     source.sql
     target.sql
   scenarios/
@@ -90,11 +90,32 @@ fixtures/
       target.sql
       scenario.json
       expected_findings.json
-    replication_lag/
-      target.sql
-      scenario.json
-      expected_findings.json
 ```
 
-This directory does not exist yet. It is a Day 2 implementation target.
+`clean_migration` and `failed_checksum` are the first implemented scenarios. The remaining scenarios are Day 2+ expansion targets.
 
+## Local Commands
+
+Start the Docker-managed databases:
+
+```sh
+make db-up
+```
+
+Load the clean scenario:
+
+```sh
+make db-reset
+```
+
+Load the failed-checksum scenario:
+
+```sh
+make db-reset SCENARIO=failed_checksum
+```
+
+Stop the databases:
+
+```sh
+make db-down
+```
