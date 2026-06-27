@@ -3,6 +3,7 @@ set -eu
 
 SCENARIO="${1:-clean_migration}"
 SOURCE_SEED="/fixtures/base/source.sql"
+QUIET="${QUIET:-0}"
 
 case "$SCENARIO" in
   clean_migration)
@@ -36,18 +37,30 @@ run_seed() {
   service="$1"
   seed="$2"
 
-  docker compose exec -T "$service" psql \
+  if [ "$QUIET" = "1" ]; then
+    quiet_flag="-q"
+  else
+    quiet_flag=""
+  fi
+
+  docker compose exec -T "$service" psql $quiet_flag \
     -v ON_ERROR_STOP=1 \
     -U validator_admin \
     -d migration_validator \
     -f "$seed"
 }
 
-docker compose up -d source-postgres target-postgres
+if [ "$QUIET" = "1" ]; then
+  docker compose up -d source-postgres target-postgres >/dev/null
+else
+  docker compose up -d source-postgres target-postgres
+fi
 wait_for_postgres source-postgres
 wait_for_postgres target-postgres
 
 run_seed source-postgres "$SOURCE_SEED"
 run_seed target-postgres "$TARGET_SEED"
 
-echo "Loaded scenario '$SCENARIO'"
+if [ "$QUIET" != "1" ]; then
+  echo "Loaded scenario '$SCENARIO'"
+fi

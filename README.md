@@ -117,6 +117,12 @@ Load the failed-checksum scenario:
 make db-reset SCENARIO=failed_checksum
 ```
 
+Run checksum validation for a scenario:
+
+```sh
+make validate-scenario SCENARIO=failed_checksum
+```
+
 Stop the fixture databases:
 
 ```sh
@@ -129,7 +135,7 @@ Day 2 should continue the deterministic database foundation:
 
 - Implement initial database introspection
 - Begin row count and schema comparison detectors
-- Wire table checksum comparison to the fixture scenarios
+- Add eval comparison against expected-findings fixtures
 
 ## Design Boundary
 

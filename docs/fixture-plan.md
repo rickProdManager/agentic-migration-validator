@@ -114,6 +114,12 @@ Load the failed-checksum scenario:
 make db-reset SCENARIO=failed_checksum
 ```
 
+Run checksum validation for a scenario:
+
+```sh
+make validate-scenario SCENARIO=failed_checksum
+```
+
 Stop the databases:
 
 ```sh
