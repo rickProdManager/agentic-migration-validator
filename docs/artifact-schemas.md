@@ -128,12 +128,22 @@ Allowed check statuses:
 
 ## Runbook
 
-The runbook may be Markdown with structured front matter.
+The runbook may be Markdown with structured front matter or a structured JSON draft. Advisor-generated runbooks must follow `docs/runbook-advisor-boundary.md`.
 
 ```json
 {
   "metadata": {},
   "title": "Migration Runbook: failed_checksum",
+  "model_calls": "disabled",
+  "claims": [
+    {
+      "claim_key": "ready_blocked",
+      "claim_type": "recommendation",
+      "claim": "Do not mark the migration ready while can_mark_ready is blocked.",
+      "evidence_refs": ["gate.can_mark_ready.failed_checksum.v1"],
+      "finding_keys": ["validation.checksum_mismatch:public.customers:*"]
+    }
+  ],
   "sections": [
     {
       "section_id": "rollback",
@@ -170,4 +180,3 @@ The runbook may be Markdown with structured front matter.
   ]
 }
 ```
-

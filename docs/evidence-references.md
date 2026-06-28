@@ -9,6 +9,7 @@ Evidence references keep generated artifacts tied to real workflow outputs. They
 | `tool.` | Output from a deterministic tool call. |
 | `validation.` | Validation result emitted by the validation stage. |
 | `finding.` | Structured finding. |
+| `gate.` | Deterministic gatekeeper result. |
 | `artifact.` | Accepted generated artifact. |
 | `audit.` | Audit event. |
 | `approval.` | Human approval event. |
@@ -84,4 +85,3 @@ If an artifact includes an unresolved reference, the workflow emits a process-co
   "summary": "Runbook claim orders_checksum_failed references missing evidence."
 }
 ```
-

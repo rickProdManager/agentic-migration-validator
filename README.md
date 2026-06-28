@@ -18,6 +18,7 @@ Implemented capabilities:
 - Axis-first schema delta policy mapping in `tools/schema_policy.py`
 - Schema-triggered data checks for relaxed nullability and dropped unique constraints
 - Deterministic cutover/readiness gate checks in `tools/gatekeeper.py`
+- Model-disabled runbook draft generation in `tools/runbook_advisor.py`
 - Risk scoring test vectors in `docs/risk-scoring-test-vectors.md`
 - Unit tests in `tests/`
 - Foundation specs for architecture, findings, evidence references, gatekeeper invariants, fixtures, artifacts, audit events, and the initial API
@@ -58,6 +59,7 @@ docs/
   gatekeeper-invariants.md
   product-requirements.md
   risk-scoring-test-vectors.md
+  runbook-advisor-boundary.md
   structured-finding-schema.md
 tests/
   test_checksum.py
@@ -66,6 +68,7 @@ tests/
   test_fixtures.py
   test_gatekeeper.py
   test_risk_scoring.py
+  test_runbook_advisor.py
   test_schema_diff.py
   test_schema_introspection.py
   test_schema_policy.py
@@ -75,6 +78,7 @@ tools/
   eval_runner.py
   gatekeeper.py
   risk_scoring.py
+  runbook_advisor.py
   schema_diff.py
   schema_introspection.py
   schema_policy.py
@@ -83,6 +87,7 @@ fixtures/
   scenarios/
 scripts/
   diff_schema.py
+  generate_runbook.py
   run_eval.py
   reset_databases.sh
   validate_scenario.py
@@ -165,6 +170,12 @@ make enforce-gate SCENARIO=clean_migration GATE=can_mark_ready
 
 This command exits nonzero when the gate is blocked.
 
+Generate a model-disabled runbook draft for one scenario:
+
+```sh
+make draft-runbook SCENARIO=failed_checksum
+```
+
 Stop the fixture databases:
 
 ```sh
@@ -211,11 +222,11 @@ That command exits nonzero because the checksum mismatch blocks readiness. The s
 
 ## Next Milestone
 
-The next milestone should begin the advisor layer carefully:
+The next milestone should harden the advisor layer:
 
-- Define the runbook advisor evidence boundary
-- Add an evidence-bound runbook artifact contract
-- Build a model-disabled runbook draft generator before enabling model calls
+- Persist representative runbook/eval artifacts for the demo path
+- Add artifact validation against evidence-reference requirements
+- Enable model-backed advisor calls only after artifact validation is deterministic
 
 ## Design Boundary
 
