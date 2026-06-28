@@ -6,7 +6,7 @@ The core product idea is simple: advisors propose, deterministic invariants disp
 
 ## Current Status
 
-This repo is in Day 2 deterministic validation work. The product requirements and architecture contracts are drafted, risk scoring is implemented, checksum validation runs against Docker PostgreSQL fixtures, eval matching is calibrated, schema introspection emits structured findings, and gatekeeper checks report cutover/readiness state.
+The Day 2 deterministic validation spine is complete. The product requirements and architecture contracts are drafted, risk scoring is implemented, checksum validation runs against Docker PostgreSQL fixtures, eval matching is calibrated, schema introspection emits structured findings, and gatekeeper checks report cutover/readiness state.
 
 Implemented today:
 
@@ -195,11 +195,11 @@ That is the central design boundary: detectors and data checks produce structure
 
 ## Next Milestone
 
-Day 2 should continue the deterministic database foundation:
+The next milestone should begin the advisor layer carefully:
 
-- Add row count and additional validation detectors
-- Add a relaxed-nullability violation fixture to mirror the relaxed-unique escalation path
-- Add a persisted eval report artifact when the demo walkthrough needs sample outputs
+- Define the runbook advisor evidence boundary
+- Add an evidence-bound runbook artifact contract
+- Build a model-disabled runbook draft generator before enabling model calls
 
 ## Design Boundary
 
