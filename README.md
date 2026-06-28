@@ -6,7 +6,7 @@ The core product idea is simple: advisors propose, deterministic invariants disp
 
 ## Current Status
 
-This repo is in Day 2 deterministic validation work. The product requirements and architecture contracts are drafted, risk scoring is implemented, checksum validation runs against Docker PostgreSQL fixtures, eval matching is calibrated, and schema introspection now emits structured findings.
+This repo is in Day 2 deterministic validation work. The product requirements and architecture contracts are drafted, risk scoring is implemented, checksum validation runs against Docker PostgreSQL fixtures, eval matching is calibrated, schema introspection emits structured findings, and gatekeeper checks report cutover/readiness state.
 
 Implemented today:
 
@@ -17,6 +17,7 @@ Implemented today:
 - Raw schema introspection and diffing in `tools/schema_introspection.py` and `tools/schema_diff.py`
 - Axis-first schema delta policy mapping in `tools/schema_policy.py`
 - Schema-triggered data checks for relaxed nullability and dropped unique constraints
+- Deterministic cutover/readiness gate checks in `tools/gatekeeper.py`
 - Risk scoring test vectors in `docs/risk-scoring-test-vectors.md`
 - Unit tests in `tests/`
 - Foundation specs for architecture, findings, evidence references, gatekeeper invariants, fixtures, artifacts, audit events, and the initial API
@@ -63,6 +64,7 @@ tests/
   test_checksum_validation.py
   test_eval_runner.py
   test_fixtures.py
+  test_gatekeeper.py
   test_risk_scoring.py
   test_schema_diff.py
   test_schema_introspection.py
@@ -71,6 +73,7 @@ tools/
   checksum.py
   checksum_validation.py
   eval_runner.py
+  gatekeeper.py
   risk_scoring.py
   schema_diff.py
   schema_introspection.py
@@ -152,11 +155,43 @@ Run deterministic fixture evals:
 make eval-scenarios
 ```
 
+The eval report includes `can_recommend_cutover` and `can_mark_ready` gate results for each fixture scenario.
+
 Stop the fixture databases:
 
 ```sh
 make db-down
 ```
+
+## Demo Walkthrough
+
+Run the deterministic fixture suite:
+
+```sh
+make eval-scenarios
+```
+
+The command resets Docker-managed source and target PostgreSQL databases for each scenario, runs checksum validation, runs schema introspection and schema-triggered data checks, compares produced findings to expected findings, and evaluates cutover/readiness gates. Model calls are disabled.
+
+The four implemented scenarios show the core pattern:
+
+| Scenario | What It Proves | Cutover/Ready |
+| --- | --- | --- |
+| `clean_migration` | Source and target data/schema match. No detector findings are emitted. | Allowed |
+| `failed_checksum` | Data content drift is caught by canonical checksums even when row counts match. | Blocked |
+| `schema_drift` | Schema differences can be structural or advisory without corrupting migrated data. Relaxed guarantees trigger row-data checks, and clean row data stays non-blocking. | Allowed |
+| `schema_relaxed_unique_violation` | The same relaxed unique constraint becomes a blocking integrity finding when target row data contains duplicates. | Blocked |
+
+Read each scenario result through three fields:
+
+- `validation_findings`: row/data validation findings, such as canonical checksum mismatches.
+- `schema_findings`: catalog-level findings, such as widened types, relaxed constraints, or extra target columns.
+- `schema_data_check_results`: row-data checks triggered by schema relaxation, such as duplicate checks after a unique constraint is dropped.
+- `gate_results`: deterministic `can_recommend_cutover` and `can_mark_ready` decisions, including the specific blocking finding keys.
+
+The important distinction is visible in the two schema scenarios. `schema_drift` drops a unique constraint but keeps payment references unique, so it emits a low structural finding and the duplicate check passes. `schema_relaxed_unique_violation` drops the same constraint and introduces duplicate payment references, so the triggered data check emits a high blocking validation finding.
+
+That is the central design boundary: detectors and data checks produce structured facts; the gatekeeper decides whether those facts block cutover/readiness; future advisors may explain or summarize, but they do not decide safety.
 
 ## Next Milestone
 
@@ -164,6 +199,7 @@ Day 2 should continue the deterministic database foundation:
 
 - Add row count and additional validation detectors
 - Add a relaxed-nullability violation fixture to mirror the relaxed-unique escalation path
+- Add a persisted eval report artifact when the demo walkthrough needs sample outputs
 
 ## Design Boundary
 

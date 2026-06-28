@@ -18,6 +18,15 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from scripts.diff_schema import diff_schema_for_scenario
 from scripts.validate_scenario import validate_scenario
 from tools.eval_runner import evaluate_findings
+from tools.gatekeeper import GateContext, evaluate_cutover_readiness
+
+
+FIXTURE_GATE_CONTEXT = GateContext(
+    validation_completed=True,
+    validation_accepted=True,
+    final_runbook_published=True,
+    approvals=("validation_acceptance", "cutover_recommendation", "ready"),
+)
 
 
 def main(argv: list[str]) -> int:
@@ -46,6 +55,10 @@ def main(argv: list[str]) -> int:
                 "validation_findings": validation_result.get("findings", []),
                 "schema_findings": schema_result.get("findings", []),
                 "schema_data_check_results": schema_result.get("data_check_results", []),
+                "gate_results": evaluate_cutover_readiness(
+                    produced_findings,
+                    FIXTURE_GATE_CONTEXT,
+                ),
                 **eval_result.to_dict(),
             }
         )

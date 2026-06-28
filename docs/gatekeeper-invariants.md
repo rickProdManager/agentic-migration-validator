@@ -2,6 +2,20 @@
 
 The deterministic gatekeeper is a set of pure functions over workflow state. Advisors may recommend actions, but only gatekeeper functions decide whether the workflow may proceed.
 
+## Implemented MVP Slice
+
+The current implementation lives in `tools/gatekeeper.py` and evaluates the two PostgreSQL MVP readiness gates used by fixture evals:
+
+- `can_recommend_cutover`
+- `can_mark_ready`
+
+The scenario eval runner uses an approval-satisfied fixture context so the report isolates detector-driven gate behavior:
+
+- `clean_migration` is allowed.
+- `schema_drift` is allowed because low structural findings and compatibility advisories do not block cutover/readiness.
+- `failed_checksum` is blocked by `validation.checksum_mismatch`.
+- `schema_relaxed_unique_violation` is blocked by checksum mismatch and the high duplicate-values validation finding.
+
 ## Gate Inputs
 
 Gate functions read:
@@ -140,4 +154,3 @@ Accepted-risk decisions may resolve or downgrade a finding only when the finding
   "checked_at": "2026-06-25T12:00:00Z"
 }
 ```
-
