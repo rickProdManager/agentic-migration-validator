@@ -183,6 +183,8 @@ Live model prose is opt-in and still passes through boundary validation:
 RUNBOOK_MODEL_CALLS=enabled OPENAI_API_KEY=... OPENAI_MODEL=... make draft-runbook SCENARIO=failed_checksum
 ```
 
+The default portfolio demo is credentials-free; live generation has not been executed in this repository because no API key is required for the deterministic safety checks. The boundary is validated deterministically against adversarial prose, so the safety property does not depend on model behavior.
+
 The live path uses deterministic gate results as the source of truth. If generated prose makes unsupported causal claims, boundary validation fails and the command exits nonzero.
 
 Stop the fixture databases:
