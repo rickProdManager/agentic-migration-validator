@@ -1,6 +1,10 @@
 import unittest
 
-from tools.runbook_advisor import generate_runbook_draft, validate_runbook_boundary
+from tools.runbook_advisor import (
+    build_live_model_prompt,
+    generate_runbook_draft,
+    validate_runbook_boundary,
+)
 
 
 CHECKSUM_FINDING = {
@@ -130,6 +134,70 @@ class RunbookAdvisorTest(unittest.TestCase):
         issues = validate_runbook_boundary(runbook)
 
         self.assertEqual(issues[0].issue, "missing_gate_evidence_ref")
+
+    def test_boundary_validation_rejects_referentially_valid_causal_overclaim(self):
+        runbook = generate_runbook_draft(
+            scenario_id="failed_checksum",
+            validation_findings=[CHECKSUM_FINDING],
+            gate_results=BLOCKED_GATES,
+            model_narrative=(
+                "The checksum mismatch indicates data corruption during transfer."
+            ),
+        )
+        issues = runbook["boundary_validation"]["issues"]
+
+        self.assertFalse(runbook["boundary_validation"]["passed"])
+        self.assertIn(
+            {
+                "claim_key": "model.narrative",
+                "issue": "unsupported_causal_language",
+            },
+            issues,
+        )
+
+    def test_boundary_validation_allows_supported_model_narrative(self):
+        runbook = generate_runbook_draft(
+            scenario_id="failed_checksum",
+            validation_findings=[CHECKSUM_FINDING],
+            gate_results=BLOCKED_GATES,
+            model_narrative=(
+                "can_mark_ready is blocked. Resolve or accept the listed blocking "
+                "finding through the workflow before continuing."
+            ),
+        )
+
+        self.assertTrue(runbook["boundary_validation"]["passed"])
+        self.assertEqual(runbook["model_calls"], "enabled")
+        self.assertEqual(runbook["metadata"]["model_calls"], "enabled")
+
+    def test_boundary_validation_allows_causal_phrase_only_when_supported_by_evidence(self):
+        finding_with_cause = {
+            **CHECKSUM_FINDING,
+            "summary": "Target data corruption is confirmed by deterministic validation.",
+        }
+        runbook = generate_runbook_draft(
+            scenario_id="failed_checksum",
+            validation_findings=[finding_with_cause],
+            gate_results=BLOCKED_GATES,
+            model_narrative=(
+                "Target data corruption is confirmed by deterministic validation."
+            ),
+        )
+
+        self.assertTrue(runbook["boundary_validation"]["passed"])
+
+    def test_live_model_prompt_preserves_evidence_boundary(self):
+        runbook = generate_runbook_draft(
+            scenario_id="failed_checksum",
+            validation_findings=[CHECKSUM_FINDING],
+            gate_results=BLOCKED_GATES,
+        )
+        prompt = build_live_model_prompt(runbook)
+
+        self.assertIn("Use only the JSON evidence below.", prompt)
+        self.assertIn("Do not decide safety", prompt)
+        self.assertIn("Do not claim root cause", prompt)
+        self.assertIn("insufficient evidence", prompt)
 
 
 if __name__ == "__main__":

@@ -157,9 +157,15 @@ The runbook may be Markdown with structured front matter or a structured JSON dr
     "validation_acceptance",
     "cutover_recommendation",
     "readiness"
-  ]
+  ],
+  "boundary_validation": {
+    "passed": true,
+    "issues": []
+  }
 }
 ```
+
+Runbook drafts may set `model_calls` to `enabled` only when live prose has been added and boundary validation passes.
 
 ## Eval Report
 

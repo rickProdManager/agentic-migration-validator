@@ -6,7 +6,7 @@ The core product idea is simple: advisors propose, deterministic invariants disp
 
 ## Current Status
 
-The deterministic validation spine is implemented. The product requirements and architecture contracts are drafted, risk scoring is available, checksum validation runs against Docker PostgreSQL fixtures, eval matching is calibrated, schema introspection emits structured findings, and gatekeeper checks report cutover/readiness state.
+The deterministic validation spine is implemented. The product requirements and architecture contracts are drafted, risk scoring is available, checksum validation runs against Docker PostgreSQL fixtures, eval matching is calibrated, schema introspection emits structured findings, gatekeeper checks enforce cutover/readiness state, and runbook drafts remain evidence-bound.
 
 Implemented capabilities:
 
@@ -18,7 +18,8 @@ Implemented capabilities:
 - Axis-first schema delta policy mapping in `tools/schema_policy.py`
 - Schema-triggered data checks for relaxed nullability and dropped unique constraints
 - Deterministic cutover/readiness gate checks in `tools/gatekeeper.py`
-- Model-disabled runbook draft generation in `tools/runbook_advisor.py`
+- Evidence-bound runbook draft generation in `tools/runbook_advisor.py`
+- Optional live model prose for runbook drafts in `tools/live_model.py`
 - Risk scoring test vectors in `docs/risk-scoring-test-vectors.md`
 - Unit tests in `tests/`
 - Foundation specs for architecture, findings, evidence references, gatekeeper invariants, fixtures, artifacts, audit events, and the initial API
@@ -32,7 +33,7 @@ Not implemented yet:
 - Workflow orchestration
 - FastAPI backend
 - Vite React dashboard
-- Model-backed advisor calls
+- Persisted eval and runbook artifact outputs
 
 ## MVP Scope
 
@@ -170,11 +171,19 @@ make enforce-gate SCENARIO=clean_migration GATE=can_mark_ready
 
 This command exits nonzero when the gate is blocked.
 
-Generate a model-disabled runbook draft for one scenario:
+Generate a deterministic runbook draft for one scenario:
 
 ```sh
 make draft-runbook SCENARIO=failed_checksum
 ```
+
+Live model prose is opt-in and still passes through boundary validation:
+
+```sh
+RUNBOOK_MODEL_CALLS=enabled OPENAI_API_KEY=... OPENAI_MODEL=... make draft-runbook SCENARIO=failed_checksum
+```
+
+The live path uses deterministic gate results as the source of truth. If generated prose makes unsupported causal claims, boundary validation fails and the command exits nonzero.
 
 Stop the fixture databases:
 
@@ -226,7 +235,7 @@ The next milestone should harden the advisor layer:
 
 - Persist representative runbook/eval artifacts for the demo path
 - Add artifact validation against evidence-reference requirements
-- Enable model-backed advisor calls only after artifact validation is deterministic
+- Run adversarial live-model reviews for `failed_checksum` and `schema_relaxed_unique_violation`
 
 ## Design Boundary
 

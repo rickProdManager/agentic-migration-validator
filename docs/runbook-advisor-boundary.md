@@ -67,11 +67,22 @@ Fallback:
 
 ## Enforcement
 
-The model-disabled runbook generator uses these rules before model-backed advisors are enabled:
+The runbook generator uses these rules before any draft can pass boundary validation:
 
 - It mirrors `gate_results` for cutover/readiness recommendations.
 - It cites finding evidence refs for finding summaries.
 - It refuses to assert readiness without gate evidence.
 - It emits structured claims with claim type and evidence refs.
+- It rejects unsupported causal language in contextualization claims.
 
-Future model-backed advisors must preserve this contract. Model prose can improve clarity, but deterministic gates remain load-bearing.
+Model-backed advisors must preserve this contract. Model prose can improve clarity, but deterministic gates remain load-bearing.
+
+## Live Model Boundary
+
+Live model prose is opt-in through `RUNBOOK_MODEL_CALLS=enabled`. The default runbook path remains deterministic and model-disabled.
+
+The live path first builds a deterministic runbook draft, then asks the model for one short narrative paragraph using only that JSON evidence. The returned prose is added as a `contextualization` claim and validated with the same boundary checker before it can pass.
+
+The boundary checker must catch more than missing references. A model paragraph can cite real evidence and still overreach semantically. For example, a checksum mismatch supports "source and target canonical digests differ"; it does not by itself support "data corruption during transfer." Protected causal phrases such as root cause, data corruption, data loss, and transfer failure are rejected unless deterministic evidence already contains that exact support.
+
+This keeps the advisor in tier three from turning a valid evidence reference into an unsupported causal story.

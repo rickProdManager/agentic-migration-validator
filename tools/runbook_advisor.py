@@ -1,4 +1,4 @@
-"""Model-disabled, evidence-bound runbook draft generation."""
+"""Evidence-bound runbook draft generation."""
 
 from __future__ import annotations
 
@@ -7,6 +7,16 @@ from typing import Any, Iterable, Mapping
 
 
 RUNBOOK_BOUNDARY_VERSION = "runbook_advisor_boundary.v1"
+UNSUPPORTED_CAUSAL_PATTERNS = (
+    "caused by",
+    "root cause",
+    "during transfer",
+    "data corruption",
+    "corruption",
+    "data loss",
+    "lost data",
+    "because of",
+)
 
 
 @dataclass(frozen=True)
@@ -25,6 +35,7 @@ def generate_runbook_draft(
     schema_findings: Iterable[Mapping[str, Any]] = (),
     schema_data_check_results: Iterable[Mapping[str, Any]] = (),
     gate_results: Mapping[str, Mapping[str, Any]] | None = None,
+    model_narrative: str | None = None,
 ) -> dict[str, Any]:
     """Generate a deterministic runbook draft from structured workflow outputs."""
 
@@ -36,6 +47,8 @@ def generate_runbook_draft(
         *_data_check_claims(schema_data_check_results),
         *_recommendation_claims(scenario_id, gates, findings),
     ]
+    if model_narrative is not None:
+        claims.append(_model_narrative_claim(scenario_id, model_narrative, gates, findings))
 
     runbook = {
         "metadata": {
@@ -44,13 +57,13 @@ def generate_runbook_draft(
             "artifact_type": "runbook",
             "format": "json",
             "status": "draft",
-            "producer": "model_disabled_runbook_advisor",
-            "model_calls": "disabled",
+            "producer": "runbook_advisor",
+            "model_calls": "enabled" if model_narrative is not None else "disabled",
             "boundary_version": RUNBOOK_BOUNDARY_VERSION,
             "evidence_refs": _unique_evidence_refs(claims),
         },
         "title": f"Migration Runbook Draft: {scenario_id}",
-        "model_calls": "disabled",
+        "model_calls": "enabled" if model_narrative is not None else "disabled",
         "summary": _summary(gates),
         "claims": claims,
         "sections": _sections(scenario_id, claims),
@@ -72,6 +85,7 @@ def validate_runbook_boundary(runbook: Mapping[str, Any]) -> tuple[RunbookBounda
     """Validate that runbook claims have the evidence required by the boundary."""
 
     issues = []
+    supported_text = _supported_evidence_text(runbook.get("claims", ()))
     for claim in runbook.get("claims", []):
         claim_key = str(claim.get("claim_key", "<missing>"))
         evidence_refs = tuple(claim.get("evidence_refs", ()))
@@ -83,7 +97,23 @@ def validate_runbook_boundary(runbook: Mapping[str, Any]) -> tuple[RunbookBounda
             issues.append(RunbookBoundaryIssue(claim_key, "missing_gate_evidence_ref"))
         if claim_type == "finding_summary" and not claim.get("finding_keys"):
             issues.append(RunbookBoundaryIssue(claim_key, "missing_finding_key"))
+        if _has_unsupported_causal_language(str(claim.get("claim", "")), supported_text):
+            issues.append(RunbookBoundaryIssue(claim_key, "unsupported_causal_language"))
     return tuple(issues)
+
+
+def build_live_model_prompt(runbook: Mapping[str, Any]) -> str:
+    """Build the constrained prompt used for optional live advisor prose."""
+
+    return (
+        "You are drafting a migration runbook note from deterministic evidence.\n"
+        "Use only the JSON evidence below.\n"
+        "Do not decide safety; gate_results already decide safety.\n"
+        "Do not claim root cause, data corruption, data loss, or transfer failure unless the evidence says that exact thing.\n"
+        "If the evidence is insufficient, write 'insufficient evidence'.\n"
+        "Return one short paragraph and nothing else.\n\n"
+        f"{_json_dumps(runbook)}"
+    )
 
 
 def _gate_claims(
@@ -216,6 +246,33 @@ def _recommendation_claims(
     return claims
 
 
+def _model_narrative_claim(
+    scenario_id: str,
+    narrative: str,
+    gate_results: Mapping[str, Mapping[str, Any]],
+    findings: tuple[Mapping[str, Any], ...],
+) -> dict[str, Any]:
+    evidence_refs = []
+    for gate in ("can_recommend_cutover", "can_mark_ready"):
+        if gate in gate_results:
+            evidence_refs.append(_gate_ref(scenario_id, gate))
+    finding_keys = []
+    for finding in findings:
+        finding_key = finding.get("finding_key")
+        if finding_key:
+            finding_keys.append(str(finding_key))
+            evidence_refs.extend(finding.get("evidence_refs", ()))
+    if not evidence_refs:
+        evidence_refs = [_gate_ref(scenario_id, "can_mark_ready")]
+    return {
+        "claim_key": "model.narrative",
+        "claim_type": "contextualization",
+        "claim": narrative,
+        "evidence_refs": _dedupe(evidence_refs),
+        "finding_keys": _dedupe(finding_keys),
+    }
+
+
 def _summary(gate_results: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
     cutover = gate_results.get("can_recommend_cutover")
     ready = gate_results.get("can_mark_ready")
@@ -265,6 +322,29 @@ def _claims_to_markdown(claims: list[dict[str, Any]]) -> str:
     if not claims:
         return "insufficient evidence"
     return "\n".join(f"- {claim['claim']}" for claim in claims)
+
+
+def _supported_evidence_text(claims: Iterable[Mapping[str, Any]]) -> str:
+    supported_claims = [
+        str(claim.get("claim", ""))
+        for claim in claims
+        if claim.get("claim_type") != "contextualization"
+    ]
+    return " ".join(supported_claims).lower()
+
+
+def _has_unsupported_causal_language(text: str, supported_text: str) -> bool:
+    normalized = text.lower()
+    return any(
+        pattern in normalized and pattern not in supported_text
+        for pattern in UNSUPPORTED_CAUSAL_PATTERNS
+    )
+
+
+def _json_dumps(payload: Mapping[str, Any]) -> str:
+    import json
+
+    return json.dumps(payload, indent=2, sort_keys=True)
 
 
 def _unique_evidence_refs(claims: Iterable[Mapping[str, Any]]) -> list[str]:
