@@ -64,6 +64,14 @@ class GateResult:
         return {key: value for key, value in payload.items() if value is not None}
 
 
+class GateBlockedError(RuntimeError):
+    """Raised when a workflow attempts to proceed through a blocked gate."""
+
+    def __init__(self, result: GateResult):
+        self.result = result
+        super().__init__(f"Gate {result.gate} is blocked")
+
+
 def evaluate_gate(
     gate: str,
     findings: Iterable[Mapping[str, Any]],
@@ -95,6 +103,19 @@ def evaluate_gate(
         unmet_prerequisites=unmet_prerequisites,
         checked_at=gate_context.checked_at,
     )
+
+
+def require_gate_allowed(
+    gate: str,
+    findings: Iterable[Mapping[str, Any]],
+    context: GateContext | None = None,
+) -> GateResult:
+    """Return a gate result or raise when the gate blocks the workflow."""
+
+    result = evaluate_gate(gate, findings, context)
+    if not result.allowed:
+        raise GateBlockedError(result)
+    return result
 
 
 def evaluate_cutover_readiness(

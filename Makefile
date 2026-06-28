@@ -1,7 +1,8 @@
-.PHONY: test db-up db-reset db-down db-logs validate-scenario schema-diff eval-scenarios
+.PHONY: test db-up db-reset db-down db-logs validate-scenario schema-diff enforce-gate eval-scenarios
 
 PYTHON ?= $(shell if [ -x .venv/bin/python ]; then echo .venv/bin/python; else echo python3; fi)
 SCENARIO ?= clean_migration
+GATE ?= can_mark_ready
 
 test:
 	$(PYTHON) -B -m pytest -q -p no:cacheprovider
@@ -18,6 +19,9 @@ validate-scenario:
 
 schema-diff:
 	@$(PYTHON) -B scripts/diff_schema.py $(SCENARIO)
+
+enforce-gate:
+	@$(PYTHON) -B scripts/enforce_gate.py $(SCENARIO) $(GATE)
 
 eval-scenarios:
 	@$(PYTHON) -B scripts/run_eval.py

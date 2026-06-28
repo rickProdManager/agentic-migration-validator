@@ -1,6 +1,12 @@
 import unittest
 
-from tools.gatekeeper import GateContext, evaluate_cutover_readiness, evaluate_gate
+from tools.gatekeeper import (
+    GateBlockedError,
+    GateContext,
+    evaluate_cutover_readiness,
+    evaluate_gate,
+    require_gate_allowed,
+)
 
 
 def finding(
@@ -143,6 +149,20 @@ class GatekeeperTest(unittest.TestCase):
         self.assertEqual(
             result.unresolved_evidence_refs,
             ("validation.checksum.public.payments.v1",),
+        )
+
+    def test_require_gate_allowed_returns_result_when_allowed(self):
+        result = require_gate_allowed("can_mark_ready", [], READY_CONTEXT)
+
+        self.assertTrue(result.allowed)
+
+    def test_require_gate_allowed_raises_when_blocked(self):
+        with self.assertRaises(GateBlockedError) as raised:
+            require_gate_allowed("can_mark_ready", [finding()], READY_CONTEXT)
+
+        self.assertEqual(
+            raised.exception.result.blocking_findings,
+            ("validation.checksum_mismatch:public.payments:*",),
         )
 
 

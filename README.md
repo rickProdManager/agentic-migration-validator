@@ -157,6 +157,14 @@ make eval-scenarios
 
 The eval report includes `can_recommend_cutover` and `can_mark_ready` gate results for each fixture scenario.
 
+Enforce one gate for one scenario:
+
+```sh
+make enforce-gate SCENARIO=clean_migration GATE=can_mark_ready
+```
+
+This command exits nonzero when the gate is blocked.
+
 Stop the fixture databases:
 
 ```sh
@@ -192,6 +200,14 @@ Read each scenario result through three fields:
 The important distinction is visible in the two schema scenarios. `schema_drift` drops a unique constraint but keeps payment references unique, so it emits a low structural finding and the duplicate check passes. `schema_relaxed_unique_violation` drops the same constraint and introduces duplicate payment references, so the triggered data check emits a high blocking validation finding.
 
 That is the central design boundary: detectors and data checks produce structured facts; the gatekeeper decides whether those facts block cutover/readiness; future advisors may explain or summarize, but they do not decide safety.
+
+To exercise the gatekeeper as a hard stop, run:
+
+```sh
+make enforce-gate SCENARIO=failed_checksum GATE=can_mark_ready
+```
+
+That command exits nonzero because the checksum mismatch blocks readiness. The same command with `SCENARIO=clean_migration` exits successfully.
 
 ## Next Milestone
 

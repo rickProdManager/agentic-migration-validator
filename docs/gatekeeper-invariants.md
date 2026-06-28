@@ -16,6 +16,8 @@ The scenario eval runner uses an approval-satisfied fixture context so the repor
 - `failed_checksum` is blocked by `validation.checksum_mismatch`.
 - `schema_relaxed_unique_violation` is blocked by checksum mismatch and the high duplicate-values validation finding.
 
+Gate enforcement is exposed through `scripts/enforce_gate.py` and `make enforce-gate`. Unlike the eval report, enforcement exits nonzero when the requested gate is blocked.
+
 ## Gate Inputs
 
 Gate functions read:
