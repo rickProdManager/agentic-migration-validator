@@ -6,9 +6,9 @@ The core product idea is simple: advisors propose, deterministic invariants disp
 
 ## Current Status
 
-The Day 2 deterministic validation spine is complete. The product requirements and architecture contracts are drafted, risk scoring is implemented, checksum validation runs against Docker PostgreSQL fixtures, eval matching is calibrated, schema introspection emits structured findings, and gatekeeper checks report cutover/readiness state.
+The deterministic validation spine is implemented. The product requirements and architecture contracts are drafted, risk scoring is available, checksum validation runs against Docker PostgreSQL fixtures, eval matching is calibrated, schema introspection emits structured findings, and gatekeeper checks report cutover/readiness state.
 
-Implemented today:
+Implemented capabilities:
 
 - Axis-aware risk scoring in `tools/risk_scoring.py`
 - Canonical row and table checksums in `tools/checksum.py`
@@ -91,7 +91,7 @@ Makefile
 pyproject.toml
 ```
 
-## Day 1 Deliverables
+## Foundation Docs
 
 | Deliverable | Status |
 | --- | --- |
