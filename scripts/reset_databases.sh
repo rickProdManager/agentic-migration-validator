@@ -15,9 +15,12 @@ case "$SCENARIO" in
   schema_drift)
     TARGET_SEED="/fixtures/scenarios/schema_drift/target.sql"
     ;;
+  schema_relaxed_unique_violation)
+    TARGET_SEED="/fixtures/scenarios/schema_relaxed_unique_violation/target.sql"
+    ;;
   *)
     echo "Unknown scenario: $SCENARIO" >&2
-    echo "Known scenarios: clean_migration, failed_checksum, schema_drift" >&2
+    echo "Known scenarios: clean_migration, failed_checksum, schema_drift, schema_relaxed_unique_violation" >&2
     exit 2
     ;;
 esac

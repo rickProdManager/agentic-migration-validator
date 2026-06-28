@@ -57,6 +57,7 @@ Each scenario should have a JSON or YAML descriptor:
 | `clean_migration` | Baseline validation | No `migration_integrity` detector findings. |
 | `missing_rows` | Row count comparison | `validation.missing_rows`. |
 | `schema_drift` | Schema comparison | `schema.type_widened`, `schema.nullability_relaxed`, `schema.unique_constraint_relaxed`, and `schema.extra_target_column`. |
+| `schema_relaxed_unique_violation` | Schema-triggered data check | `validation.duplicate_values_after_unique_relaxation`. |
 | `bad_types` | Schema comparison | `schema.precision_sensitive_type_change`. |
 | `broken_fk` | Referential integrity check | `validation.broken_referential_integrity`. |
 | `null_distribution_change` | Null distribution check | `validation.null_distribution_mismatch`. |
@@ -94,9 +95,13 @@ fixtures/
       target.sql
       scenario.json
       expected_findings.json
+    schema_relaxed_unique_violation/
+      target.sql
+      scenario.json
+      expected_findings.json
 ```
 
-`clean_migration`, `failed_checksum`, and `schema_drift` are the first implemented scenarios. `schema_drift` stores both expected raw schema deltas and expected structured schema findings, including the data checks triggered by relaxed nullability and dropped uniqueness.
+`clean_migration`, `failed_checksum`, `schema_drift`, and `schema_relaxed_unique_violation` are the first implemented scenarios. `schema_drift` proves relaxed schema guarantees stay low when row data remains clean. `schema_relaxed_unique_violation` proves a relaxed unique constraint escalates to a blocking validation finding when duplicate data exists.
 
 ## Local Commands
 

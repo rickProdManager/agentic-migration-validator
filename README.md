@@ -21,12 +21,11 @@ Implemented today:
 - Unit tests in `tests/`
 - Foundation specs for architecture, findings, evidence references, gatekeeper invariants, fixtures, artifacts, audit events, and the initial API
 - Docker Compose fixture databases for `source-postgres` and `target-postgres`
-- Seed fixtures for `clean_migration`, `failed_checksum`, and `schema_drift`
+- Seed fixtures for `clean_migration`, `failed_checksum`, `schema_drift`, and `schema_relaxed_unique_violation`
 
 Not implemented yet:
 
 - Persisted eval report artifacts
-- Additional conditional-escalation fixtures where relaxed schema guarantees are breached in row data
 - Additional data validation detectors beyond checksum
 - Workflow orchestration
 - FastAPI backend
@@ -163,8 +162,8 @@ make db-down
 
 Day 2 should continue the deterministic database foundation:
 
-- Add a failing conditional-escalation scenario for relaxed nullability or dropped uniqueness
 - Add row count and additional validation detectors
+- Add a relaxed-nullability violation fixture to mirror the relaxed-unique escalation path
 
 ## Design Boundary
 

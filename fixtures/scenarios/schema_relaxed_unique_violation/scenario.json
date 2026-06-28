@@ -1,0 +1,14 @@
+{
+  "scenario_id": "schema_relaxed_unique_violation",
+  "description": "Target drops a source unique constraint and contains duplicate values that the source model forbids.",
+  "source_seed": "fixtures/base/source.sql",
+  "target_seed": "fixtures/scenarios/schema_relaxed_unique_violation/target.sql",
+  "critical_tables": ["customers", "orders", "payments"],
+  "business_keys": {
+    "customers": ["email"],
+    "orders": ["order_number"],
+    "payments": ["payment_reference"]
+  },
+  "allowed_lag": null,
+  "expected_results": "fixtures/scenarios/schema_relaxed_unique_violation/expected_findings.json"
+}

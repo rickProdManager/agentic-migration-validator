@@ -1,0 +1,69 @@
+{
+  "scenario_id": "schema_relaxed_unique_violation",
+  "model_calls": "disabled",
+  "expected_findings": [
+    {
+      "record_type": "detector_finding",
+      "risk_axis": "migration_integrity",
+      "finding_key": "validation.checksum_mismatch:public.payments:*",
+      "finding_type": "validation.checksum_mismatch",
+      "detector": "canonical_checksum",
+      "severity": "high",
+      "scope": {
+        "schema": "public",
+        "table": "payments",
+        "column": null,
+        "constraint": null,
+        "business_key": null
+      }
+    },
+    {
+      "record_type": "detector_finding",
+      "risk_axis": "migration_integrity",
+      "finding_key": "schema.unique_constraint_relaxed:public.payments:payments_payment_reference_key",
+      "finding_type": "schema.unique_constraint_relaxed",
+      "detector": "schema_diff",
+      "severity": "low",
+      "scope": {
+        "schema": "public",
+        "table": "payments",
+        "column": null,
+        "constraint": "payments_payment_reference_key",
+        "business_key": null
+      }
+    },
+    {
+      "record_type": "detector_finding",
+      "risk_axis": "migration_integrity",
+      "finding_key": "validation.duplicate_values_after_unique_relaxation:public.payments:payments_payment_reference_key",
+      "finding_type": "validation.duplicate_values_after_unique_relaxation",
+      "detector": "schema_triggered_data_check",
+      "severity": "high",
+      "scope": {
+        "schema": "public",
+        "table": "payments",
+        "column": null,
+        "constraint": "payments_payment_reference_key",
+        "business_key": null
+      }
+    }
+  ],
+  "expected_schema_deltas": [
+    {
+      "delta_type": "missing_unique_constraint",
+      "schema": "public",
+      "table": "payments",
+      "constraint": "payments_payment_reference_key"
+    }
+  ],
+  "expected_data_checks": [
+    {
+      "check_type": "duplicates_after_unique_relaxation",
+      "schema": "public",
+      "table": "payments",
+      "constraint": "payments_payment_reference_key",
+      "duplicate_group_count": 1
+    }
+  ],
+  "allowed_extra_findings": []
+}

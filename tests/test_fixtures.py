@@ -103,6 +103,55 @@ class FixtureManifestTest(unittest.TestCase):
         self.assertIn("TYPE numeric(12, 4)", target_sql)
         self.assertIn("ADD COLUMN source_system text", target_sql)
 
+    def test_schema_relaxed_unique_violation_declares_escalation_findings(self):
+        expected = self.load_json(
+            SCENARIOS_ROOT / "schema_relaxed_unique_violation" / "expected_findings.json"
+        )
+        finding_keys = {finding["finding_key"] for finding in expected["expected_findings"]}
+        data_checks = {
+            (
+                check["check_type"],
+                check["schema"],
+                check["table"],
+                check.get("constraint"),
+                check.get("duplicate_group_count"),
+            )
+            for check in expected["expected_data_checks"]
+        }
+
+        self.assertEqual(expected["scenario_id"], "schema_relaxed_unique_violation")
+        self.assertEqual(
+            finding_keys,
+            {
+                "validation.checksum_mismatch:public.payments:*",
+                "schema.unique_constraint_relaxed:public.payments:payments_payment_reference_key",
+                "validation.duplicate_values_after_unique_relaxation:public.payments:payments_payment_reference_key",
+            },
+        )
+        self.assertEqual(
+            data_checks,
+            {
+                (
+                    "duplicates_after_unique_relaxation",
+                    "public",
+                    "payments",
+                    "payments_payment_reference_key",
+                    1,
+                ),
+            },
+        )
+
+    def test_schema_relaxed_unique_violation_target_drops_unique_and_duplicates_data(self):
+        target_sql = (
+            SCENARIOS_ROOT / "schema_relaxed_unique_violation" / "target.sql"
+        ).read_text()
+
+        self.assertIn("/fixtures/base/common.sql", target_sql)
+        self.assertIn("DROP CONSTRAINT payments_payment_reference_key", target_sql)
+        self.assertIn("UPDATE payments", target_sql)
+        self.assertIn("payment_reference = 'PAY-100'", target_sql)
+        self.assertIn("payment_id = 5001", target_sql)
+
 
 if __name__ == "__main__":
     unittest.main()
