@@ -15,6 +15,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SCENARIOS_ROOT = PROJECT_ROOT / "fixtures" / "scenarios"
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from scripts.diff_schema import diff_schema_for_scenario
 from scripts.validate_scenario import validate_scenario
 from tools.eval_runner import evaluate_findings
 
@@ -27,10 +28,15 @@ def main(argv: list[str]) -> int:
         scenario = _load_scenario(scenario_id)
         _reset_scenario(scenario_id)
         validation_result = validate_scenario(scenario_id)
+        schema_result = diff_schema_for_scenario(scenario_id)
+        produced_findings = [
+            *validation_result.get("findings", []),
+            *schema_result.get("findings", []),
+        ]
         expected_results = _load_json(PROJECT_ROOT / scenario["expected_results"])
         eval_result = evaluate_findings(
             expected_findings=expected_results.get("expected_findings", []),
-            produced_findings=validation_result.get("findings", []),
+            produced_findings=produced_findings,
             allowed_extra_findings=expected_results.get("allowed_extra_findings", []),
         )
         scenario_results.append(
@@ -38,6 +44,8 @@ def main(argv: list[str]) -> int:
                 "scenario_id": scenario_id,
                 "model_calls": "disabled",
                 "validation_findings": validation_result.get("findings", []),
+                "schema_findings": schema_result.get("findings", []),
+                "schema_data_check_results": schema_result.get("data_check_results", []),
                 **eval_result.to_dict(),
             }
         )

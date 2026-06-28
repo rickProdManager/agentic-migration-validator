@@ -6,7 +6,7 @@ The core product idea is simple: advisors propose, deterministic invariants disp
 
 ## Current Status
 
-This repo is in Day 2 deterministic validation work. The product requirements and architecture contracts are drafted, risk scoring is implemented, checksum validation runs against Docker PostgreSQL fixtures, eval matching is calibrated, and raw schema introspection/diffing is available.
+This repo is in Day 2 deterministic validation work. The product requirements and architecture contracts are drafted, risk scoring is implemented, checksum validation runs against Docker PostgreSQL fixtures, eval matching is calibrated, and schema introspection now emits structured findings.
 
 Implemented today:
 
@@ -15,6 +15,8 @@ Implemented today:
 - Checksum validation findings in `tools/checksum_validation.py`
 - Detection eval matching in `tools/eval_runner.py`
 - Raw schema introspection and diffing in `tools/schema_introspection.py` and `tools/schema_diff.py`
+- Axis-first schema delta policy mapping in `tools/schema_policy.py`
+- Schema-triggered data checks for relaxed nullability and dropped unique constraints
 - Risk scoring test vectors in `docs/risk-scoring-test-vectors.md`
 - Unit tests in `tests/`
 - Foundation specs for architecture, findings, evidence references, gatekeeper invariants, fixtures, artifacts, audit events, and the initial API
@@ -23,8 +25,8 @@ Implemented today:
 
 Not implemented yet:
 
-- Schema-delta-to-finding severity and gate-effect mapping
 - Persisted eval report artifacts
+- Additional conditional-escalation fixtures where relaxed schema guarantees are breached in row data
 - Additional data validation detectors beyond checksum
 - Workflow orchestration
 - FastAPI backend
@@ -65,6 +67,7 @@ tests/
   test_risk_scoring.py
   test_schema_diff.py
   test_schema_introspection.py
+  test_schema_policy.py
 tools/
   checksum.py
   checksum_validation.py
@@ -72,6 +75,7 @@ tools/
   risk_scoring.py
   schema_diff.py
   schema_introspection.py
+  schema_policy.py
 fixtures/
   base/
   scenarios/
@@ -159,8 +163,7 @@ make db-down
 
 Day 2 should continue the deterministic database foundation:
 
-- Decide how raw schema deltas map to structured findings, severities, and gate effects
-- Emit schema detector findings for `schema_drift`
+- Add a failing conditional-escalation scenario for relaxed nullability or dropped uniqueness
 - Add row count and additional validation detectors
 
 ## Design Boundary

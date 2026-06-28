@@ -56,7 +56,7 @@ Each scenario should have a JSON or YAML descriptor:
 | --- | --- | --- |
 | `clean_migration` | Baseline validation | No `migration_integrity` detector findings. |
 | `missing_rows` | Row count comparison | `validation.missing_rows`. |
-| `schema_drift` | Schema comparison | `schema.missing_primary_key` or another schema drift finding. |
+| `schema_drift` | Schema comparison | `schema.type_widened`, `schema.nullability_relaxed`, `schema.unique_constraint_relaxed`, and `schema.extra_target_column`. |
 | `bad_types` | Schema comparison | `schema.precision_sensitive_type_change`. |
 | `broken_fk` | Referential integrity check | `validation.broken_referential_integrity`. |
 | `null_distribution_change` | Null distribution check | `validation.null_distribution_mismatch`. |
@@ -96,7 +96,7 @@ fixtures/
       expected_findings.json
 ```
 
-`clean_migration`, `failed_checksum`, and `schema_drift` are the first implemented scenarios. `schema_drift` currently stores expected raw schema deltas; mapping those deltas to structured detector findings is the next design decision.
+`clean_migration`, `failed_checksum`, and `schema_drift` are the first implemented scenarios. `schema_drift` stores both expected raw schema deltas and expected structured schema findings, including the data checks triggered by relaxed nullability and dropped uniqueness.
 
 ## Local Commands
 

@@ -1,7 +1,68 @@
 {
   "scenario_id": "schema_drift",
   "model_calls": "disabled",
-  "expected_findings": [],
+  "expected_findings": [
+    {
+      "record_type": "detector_finding",
+      "risk_axis": "compatibility_advisory",
+      "finding_key": "schema.type_widened:public.orders:total_amount",
+      "finding_type": "schema.type_widened",
+      "detector": "schema_diff",
+      "severity": "low",
+      "scope": {
+        "schema": "public",
+        "table": "orders",
+        "column": "total_amount",
+        "constraint": null,
+        "business_key": null
+      }
+    },
+    {
+      "record_type": "detector_finding",
+      "risk_axis": "migration_integrity",
+      "finding_key": "schema.nullability_relaxed:public.payments:method",
+      "finding_type": "schema.nullability_relaxed",
+      "detector": "schema_diff",
+      "severity": "low",
+      "scope": {
+        "schema": "public",
+        "table": "payments",
+        "column": "method",
+        "constraint": null,
+        "business_key": null
+      }
+    },
+    {
+      "record_type": "detector_finding",
+      "risk_axis": "migration_integrity",
+      "finding_key": "schema.unique_constraint_relaxed:public.payments:payments_payment_reference_key",
+      "finding_type": "schema.unique_constraint_relaxed",
+      "detector": "schema_diff",
+      "severity": "low",
+      "scope": {
+        "schema": "public",
+        "table": "payments",
+        "column": null,
+        "constraint": "payments_payment_reference_key",
+        "business_key": null
+      }
+    },
+    {
+      "record_type": "detector_finding",
+      "risk_axis": "compatibility_advisory",
+      "finding_key": "schema.extra_target_column:public.subscriptions:source_system",
+      "finding_type": "schema.extra_target_column",
+      "detector": "schema_diff",
+      "severity": "low",
+      "scope": {
+        "schema": "public",
+        "table": "subscriptions",
+        "column": "source_system",
+        "constraint": null,
+        "business_key": null
+      }
+    }
+  ],
   "expected_schema_deltas": [
     {
       "delta_type": "changed_column_type",

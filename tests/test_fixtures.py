@@ -56,6 +56,7 @@ class FixtureManifestTest(unittest.TestCase):
         expected = self.load_json(
             SCENARIOS_ROOT / "schema_drift" / "expected_findings.json"
         )
+        finding_keys = {finding["finding_key"] for finding in expected["expected_findings"]}
         deltas = {
             (
                 delta["delta_type"],
@@ -68,7 +69,15 @@ class FixtureManifestTest(unittest.TestCase):
         }
 
         self.assertEqual(expected["scenario_id"], "schema_drift")
-        self.assertEqual(expected["expected_findings"], [])
+        self.assertEqual(
+            finding_keys,
+            {
+                "schema.type_widened:public.orders:total_amount",
+                "schema.nullability_relaxed:public.payments:method",
+                "schema.unique_constraint_relaxed:public.payments:payments_payment_reference_key",
+                "schema.extra_target_column:public.subscriptions:source_system",
+            },
+        )
         self.assertEqual(
             deltas,
             {
@@ -91,7 +100,7 @@ class FixtureManifestTest(unittest.TestCase):
         self.assertIn("/fixtures/base/common.sql", target_sql)
         self.assertIn("DROP CONSTRAINT payments_payment_reference_key", target_sql)
         self.assertIn("ALTER COLUMN method DROP NOT NULL", target_sql)
-        self.assertIn("TYPE numeric(10, 4)", target_sql)
+        self.assertIn("TYPE numeric(12, 4)", target_sql)
         self.assertIn("ADD COLUMN source_system text", target_sql)
 
 
