@@ -52,6 +52,48 @@ class FixtureManifestTest(unittest.TestCase):
         self.assertIn("UPDATE customers", target_sql)
         self.assertIn("full_name = 'Ada L.'", target_sql)
 
+    def test_schema_drift_declares_raw_expected_deltas(self):
+        expected = self.load_json(
+            SCENARIOS_ROOT / "schema_drift" / "expected_findings.json"
+        )
+        deltas = {
+            (
+                delta["delta_type"],
+                delta["schema"],
+                delta.get("table"),
+                delta.get("column"),
+                delta.get("constraint"),
+            )
+            for delta in expected["expected_schema_deltas"]
+        }
+
+        self.assertEqual(expected["scenario_id"], "schema_drift")
+        self.assertEqual(expected["expected_findings"], [])
+        self.assertEqual(
+            deltas,
+            {
+                ("changed_column_type", "public", "orders", "total_amount", None),
+                ("changed_nullability", "public", "payments", "method", None),
+                (
+                    "missing_unique_constraint",
+                    "public",
+                    "payments",
+                    None,
+                    "payments_payment_reference_key",
+                ),
+                ("extra_column", "public", "subscriptions", "source_system", None),
+            },
+        )
+
+    def test_schema_drift_target_is_schema_only_drift(self):
+        target_sql = (SCENARIOS_ROOT / "schema_drift" / "target.sql").read_text()
+
+        self.assertIn("/fixtures/base/common.sql", target_sql)
+        self.assertIn("DROP CONSTRAINT payments_payment_reference_key", target_sql)
+        self.assertIn("ALTER COLUMN method DROP NOT NULL", target_sql)
+        self.assertIn("TYPE numeric(10, 4)", target_sql)
+        self.assertIn("ADD COLUMN source_system text", target_sql)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,14 @@
+{
+  "scenario_id": "schema_drift",
+  "description": "Target data still checksums cleanly, but target schema diverges from the source catalog.",
+  "source_seed": "fixtures/base/source.sql",
+  "target_seed": "fixtures/scenarios/schema_drift/target.sql",
+  "critical_tables": ["customers", "orders", "payments"],
+  "business_keys": {
+    "customers": ["email"],
+    "orders": ["order_number"],
+    "payments": ["payment_reference"]
+  },
+  "allowed_lag": null,
+  "expected_results": "fixtures/scenarios/schema_drift/expected_findings.json"
+}

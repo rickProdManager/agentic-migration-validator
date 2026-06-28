@@ -1,4 +1,4 @@
-.PHONY: test db-up db-reset db-down db-logs validate-scenario
+.PHONY: test db-up db-reset db-down db-logs validate-scenario schema-diff eval-scenarios
 
 PYTHON ?= $(shell if [ -x .venv/bin/python ]; then echo .venv/bin/python; else echo python3; fi)
 SCENARIO ?= clean_migration
@@ -15,6 +15,12 @@ db-reset:
 validate-scenario:
 	@QUIET=1 sh scripts/reset_databases.sh $(SCENARIO) >/dev/null 2>&1
 	@$(PYTHON) -B scripts/validate_scenario.py $(SCENARIO)
+
+schema-diff:
+	@$(PYTHON) -B scripts/diff_schema.py $(SCENARIO)
+
+eval-scenarios:
+	@$(PYTHON) -B scripts/run_eval.py
 
 db-down:
 	docker compose down

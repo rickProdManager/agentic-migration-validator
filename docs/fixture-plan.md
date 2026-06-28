@@ -90,9 +90,13 @@ fixtures/
       target.sql
       scenario.json
       expected_findings.json
+    schema_drift/
+      target.sql
+      scenario.json
+      expected_findings.json
 ```
 
-`clean_migration` and `failed_checksum` are the first implemented scenarios. The remaining scenarios are Day 2+ expansion targets.
+`clean_migration`, `failed_checksum`, and `schema_drift` are the first implemented scenarios. `schema_drift` currently stores expected raw schema deltas; mapping those deltas to structured detector findings is the next design decision.
 
 ## Local Commands
 
@@ -118,6 +122,18 @@ Run checksum validation for a scenario:
 
 ```sh
 make validate-scenario SCENARIO=failed_checksum
+```
+
+Run raw schema diff introspection for a scenario:
+
+```sh
+make schema-diff SCENARIO=schema_drift
+```
+
+Run deterministic fixture evals:
+
+```sh
+make eval-scenarios
 ```
 
 Stop the databases:

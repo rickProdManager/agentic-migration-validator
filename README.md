@@ -6,27 +6,29 @@ The core product idea is simple: advisors propose, deterministic invariants disp
 
 ## Current Status
 
-This repo is in early Day 2 work. The product requirements and architecture contracts are drafted, deterministic risk scoring is implemented, checksum canonicalization is implemented, and the first PostgreSQL fixture environment is available.
+This repo is in Day 2 deterministic validation work. The product requirements and architecture contracts are drafted, risk scoring is implemented, checksum validation runs against Docker PostgreSQL fixtures, eval matching is calibrated, and raw schema introspection/diffing is available.
 
 Implemented today:
 
 - Axis-aware risk scoring in `tools/risk_scoring.py`
 - Canonical row and table checksums in `tools/checksum.py`
+- Checksum validation findings in `tools/checksum_validation.py`
+- Detection eval matching in `tools/eval_runner.py`
+- Raw schema introspection and diffing in `tools/schema_introspection.py` and `tools/schema_diff.py`
 - Risk scoring test vectors in `docs/risk-scoring-test-vectors.md`
 - Unit tests in `tests/`
 - Foundation specs for architecture, findings, evidence references, gatekeeper invariants, fixtures, artifacts, audit events, and the initial API
 - Docker Compose fixture databases for `source-postgres` and `target-postgres`
-- Seed fixtures for `clean_migration` and `failed_checksum`
+- Seed fixtures for `clean_migration`, `failed_checksum`, and `schema_drift`
 
 Not implemented yet:
 
-- Database introspection
-- Schema diffing
-- Data validation detector tooling
+- Schema-delta-to-finding severity and gate-effect mapping
+- Persisted eval report artifacts
+- Additional data validation detectors beyond checksum
 - Workflow orchestration
 - FastAPI backend
 - Vite React dashboard
-- Evaluation runner
 - Model-backed advisor calls
 
 ## MVP Scope
@@ -57,15 +59,27 @@ docs/
   structured-finding-schema.md
 tests/
   test_checksum.py
+  test_checksum_validation.py
+  test_eval_runner.py
+  test_fixtures.py
   test_risk_scoring.py
+  test_schema_diff.py
+  test_schema_introspection.py
 tools/
   checksum.py
+  checksum_validation.py
+  eval_runner.py
   risk_scoring.py
+  schema_diff.py
+  schema_introspection.py
 fixtures/
   base/
   scenarios/
 scripts/
+  diff_schema.py
+  run_eval.py
   reset_databases.sh
+  validate_scenario.py
 docker-compose.yml
 Makefile
 pyproject.toml
@@ -123,6 +137,18 @@ Run checksum validation for a scenario:
 make validate-scenario SCENARIO=failed_checksum
 ```
 
+Run raw schema diff introspection for a scenario:
+
+```sh
+make schema-diff SCENARIO=schema_drift
+```
+
+Run deterministic fixture evals:
+
+```sh
+make eval-scenarios
+```
+
 Stop the fixture databases:
 
 ```sh
@@ -133,9 +159,9 @@ make db-down
 
 Day 2 should continue the deterministic database foundation:
 
-- Implement initial database introspection
-- Begin row count and schema comparison detectors
-- Add eval comparison against expected-findings fixtures
+- Decide how raw schema deltas map to structured findings, severities, and gate effects
+- Emit schema detector findings for `schema_drift`
+- Add row count and additional validation detectors
 
 ## Design Boundary
 

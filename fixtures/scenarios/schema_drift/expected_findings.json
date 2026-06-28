@@ -1,0 +1,32 @@
+{
+  "scenario_id": "schema_drift",
+  "model_calls": "disabled",
+  "expected_findings": [],
+  "expected_schema_deltas": [
+    {
+      "delta_type": "changed_column_type",
+      "schema": "public",
+      "table": "orders",
+      "column": "total_amount"
+    },
+    {
+      "delta_type": "changed_nullability",
+      "schema": "public",
+      "table": "payments",
+      "column": "method"
+    },
+    {
+      "delta_type": "missing_unique_constraint",
+      "schema": "public",
+      "table": "payments",
+      "constraint": "payments_payment_reference_key"
+    },
+    {
+      "delta_type": "extra_column",
+      "schema": "public",
+      "table": "subscriptions",
+      "column": "source_system"
+    }
+  ],
+  "allowed_extra_findings": []
+}

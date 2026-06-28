@@ -23,6 +23,12 @@ from tools.checksum_validation import compare_table_checksum
 
 def main(argv: list[str]) -> int:
     scenario_id = argv[1] if len(argv) > 1 else "clean_migration"
+    result = validate_scenario(scenario_id)
+    print(json.dumps(result, indent=2, sort_keys=True))
+    return 0
+
+
+def validate_scenario(scenario_id: str) -> dict[str, Any]:
     scenario = _load_scenario(scenario_id)
     tables = _list_tables("source-postgres")
     critical_tables = set(scenario.get("critical_tables", []))
@@ -46,7 +52,7 @@ def main(argv: list[str]) -> int:
         if finding is not None:
             findings.append(finding)
 
-    result = {
+    return {
         "scenario_id": scenario_id,
         "model_calls": "disabled",
         "stage": "validation",
@@ -54,8 +60,6 @@ def main(argv: list[str]) -> int:
         "evidence": evidence,
         "findings": findings,
     }
-    print(json.dumps(result, indent=2, sort_keys=True))
-    return 0
 
 
 def _load_scenario(scenario_id: str) -> dict[str, Any]:
