@@ -207,6 +207,18 @@ Implemented routes:
 - `GET /evidence/{evidence_ref}`
 - `POST /workflows/run`
 
+Smoke-test the running local API:
+
+```sh
+make api-smoke
+```
+
+With Docker fixtures running, smoke-test the workflow and retrieval routes:
+
+```sh
+SMOKE_WORKFLOW_SCENARIO=failed_checksum make api-smoke
+```
+
 Enforce one gate for one scenario:
 
 ```sh

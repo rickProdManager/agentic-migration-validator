@@ -1,11 +1,16 @@
-.PHONY: test db-up db-reset db-down db-logs validate-scenario schema-diff enforce-gate draft-runbook run-api run-workflow write-artifacts eval-scenarios
+.PHONY: test api-smoke db-up db-reset db-down db-logs validate-scenario schema-diff enforce-gate draft-runbook run-api run-workflow write-artifacts eval-scenarios
 
 PYTHON ?= $(shell if [ -x .venv/bin/python ]; then echo .venv/bin/python; else echo python3; fi)
 SCENARIO ?= clean_migration
 GATE ?= can_mark_ready
+API_BASE_URL ?= http://127.0.0.1:8080
+SMOKE_WORKFLOW_SCENARIO ?=
 
 test:
 	$(PYTHON) -B -m pytest -q -p no:cacheprovider
+
+api-smoke:
+	@$(PYTHON) -B scripts/smoke_api.py --base-url $(API_BASE_URL) $(if $(SMOKE_WORKFLOW_SCENARIO),--workflow-scenario $(SMOKE_WORKFLOW_SCENARIO),)
 
 db-up:
 	docker compose up -d source-postgres target-postgres
