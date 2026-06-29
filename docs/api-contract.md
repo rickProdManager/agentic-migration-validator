@@ -218,6 +218,19 @@ Optional query string:
 scenario_id=failed_checksum&scenario_id=schema_drift
 ```
 
+Unknown `scenario_id` values are rejected before workflow execution.
+
+Error:
+
+```json
+{
+  "error": {
+    "code": "unknown_scenario",
+    "message": "Unknown scenario_id: missing_scenario"
+  }
+}
+```
+
 Response:
 
 ```json
@@ -251,6 +264,46 @@ Response:
   "passed": true,
   "artifact_count": 6,
   "artifacts": []
+}
+```
+
+Implemented by `make run-api`.
+
+### `GET /artifacts/{artifact_id}`
+
+Returns one generated artifact by ID using the latest local artifact manifest.
+
+Response:
+
+```json
+{
+  "artifact_id": "artifact.runbook_draft.failed_checksum.v1",
+  "path": "artifacts/scenarios/failed_checksum/runbook.json",
+  "content_hash": "sha256:example",
+  "metadata": {
+    "artifact_type": "runbook",
+    "scenario_id": "failed_checksum"
+  },
+  "content": {}
+}
+```
+
+Implemented by `make run-api`.
+
+### `GET /evidence/{evidence_ref}`
+
+Resolves an evidence reference through `artifacts/evidence_registry.json`.
+
+Response:
+
+```json
+{
+  "evidence_ref": "validation.checksum.public.customers.v1",
+  "entry": {
+    "source_artifact_id": "artifact.eval_report.fixture_suite.v1",
+    "source_artifact_path": "eval_report.json",
+    "content_hash": "sha256:example"
+  }
 }
 ```
 

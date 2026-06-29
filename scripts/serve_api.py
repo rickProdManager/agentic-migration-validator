@@ -7,14 +7,22 @@ import json
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from scripts.run_eval import default_scenario_ids
 from scripts.run_workflow import run_fixture_workflow
-from tools.api import error_response, health_response, latest_manifest_response, scenarios_response
+from tools.api import (
+    artifact_response,
+    error_response,
+    evidence_response,
+    health_response,
+    latest_manifest_response,
+    scenarios_response,
+    validate_requested_scenarios,
+)
 
 
 DEFAULT_HOST = "127.0.0.1"
@@ -36,6 +44,16 @@ class WorkflowApiHandler(BaseHTTPRequestHandler):
             status, payload = latest_manifest_response(PROJECT_ROOT)
             self._write_json(status, payload)
             return
+        if parsed.path.startswith("/artifacts/"):
+            artifact_id = unquote(parsed.path.removeprefix("/artifacts/"))
+            status, payload = artifact_response(PROJECT_ROOT, artifact_id)
+            self._write_json(status, payload)
+            return
+        if parsed.path.startswith("/evidence/"):
+            evidence_ref = unquote(parsed.path.removeprefix("/evidence/"))
+            status, payload = evidence_response(PROJECT_ROOT, evidence_ref)
+            self._write_json(status, payload)
+            return
 
         status, payload = error_response(
             "not_found",
@@ -49,6 +67,11 @@ class WorkflowApiHandler(BaseHTTPRequestHandler):
         if parsed.path == "/workflows/run":
             query = parse_qs(parsed.query)
             scenario_ids = query.get("scenario_id") or default_scenario_ids()
+            validation_error = validate_requested_scenarios(PROJECT_ROOT, list(scenario_ids))
+            if validation_error is not None:
+                status, payload = validation_error
+                self._write_json(status, payload)
+                return
             self._write_json(200, run_fixture_workflow(list(scenario_ids)))
             return
 

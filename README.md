@@ -203,6 +203,8 @@ Implemented routes:
 - `GET /health`
 - `GET /scenarios`
 - `GET /artifacts/latest-manifest`
+- `GET /artifacts/{artifact_id}`
+- `GET /evidence/{evidence_ref}`
 - `POST /workflows/run`
 
 Enforce one gate for one scenario:
