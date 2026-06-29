@@ -20,6 +20,11 @@ Implemented capabilities:
 - Deterministic cutover/readiness gate checks in `tools/gatekeeper.py`
 - Evidence-bound runbook draft generation in `tools/runbook_advisor.py`
 - Optional live model prose for runbook drafts in `tools/live_model.py`
+- Reproducible local artifact bundles in `artifacts/`
+- Artifact metadata, hashing, and validation in `tools/artifacts.py`
+- Evidence registry generation and reference resolution for artifact bundles
+- Dependency-free local JSON API surface in `tools/api.py`
+- Local workflow run response in `tools/workflow.py`
 - Risk scoring test vectors in `docs/risk-scoring-test-vectors.md`
 - Unit tests in `tests/`
 - Foundation specs for architecture, findings, evidence references, gatekeeper invariants, fixtures, artifacts, audit events, and the initial API
@@ -28,12 +33,10 @@ Implemented capabilities:
 
 Not implemented yet:
 
-- Persisted eval report artifacts
 - Additional data validation detectors beyond checksum
-- Workflow orchestration
-- FastAPI backend
+- Full workflow orchestration
+- Full FastAPI backend
 - Vite React dashboard
-- Persisted eval and runbook artifact outputs
 
 ## MVP Scope
 
@@ -63,6 +66,8 @@ docs/
   runbook-advisor-boundary.md
   structured-finding-schema.md
 tests/
+  test_api.py
+  test_artifacts.py
   test_checksum.py
   test_checksum_validation.py
   test_eval_runner.py
@@ -73,7 +78,10 @@ tests/
   test_schema_diff.py
   test_schema_introspection.py
   test_schema_policy.py
+  test_workflow.py
 tools/
+  api.py
+  artifacts.py
   checksum.py
   checksum_validation.py
   eval_runner.py
@@ -83,6 +91,7 @@ tools/
   schema_diff.py
   schema_introspection.py
   schema_policy.py
+  workflow.py
 fixtures/
   base/
   scenarios/
@@ -90,6 +99,9 @@ scripts/
   diff_schema.py
   generate_runbook.py
   run_eval.py
+  serve_api.py
+  run_workflow.py
+  write_artifacts.py
   reset_databases.sh
   validate_scenario.py
 docker-compose.yml
@@ -163,6 +175,36 @@ make eval-scenarios
 
 The eval report includes `can_recommend_cutover` and `can_mark_ready` gate results for each fixture scenario.
 
+Write a local artifact bundle:
+
+```sh
+make write-artifacts
+```
+
+This writes a validated eval report and runbook drafts under `artifacts/`. The generated directory is ignored by git because artifacts are reproducible local outputs.
+The bundle includes an evidence registry so artifact evidence refs resolve to stored bundle entries.
+
+Run the local fixture workflow:
+
+```sh
+make run-workflow
+```
+
+This emits an API-shaped workflow response with step status, scenario IDs, artifact refs, workflow validation, and the artifact manifest. It is the local contract the future backend can wrap.
+
+Serve the local JSON API:
+
+```sh
+make run-api
+```
+
+Implemented routes:
+
+- `GET /health`
+- `GET /scenarios`
+- `GET /artifacts/latest-manifest`
+- `POST /workflows/run`
+
 Enforce one gate for one scenario:
 
 ```sh
@@ -233,10 +275,9 @@ That command exits nonzero because the checksum mismatch blocks readiness. The s
 
 ## Next Milestone
 
-The next milestone should harden the advisor layer:
+The next milestone should wrap the validated artifact layer:
 
-- Persist representative runbook/eval artifacts for the demo path
-- Add artifact validation against evidence-reference requirements
+- Expand the local API only where the workflow needs it
 - Run adversarial live-model reviews for `failed_checksum` and `schema_relaxed_unique_violation`
 
 ## Design Boundary

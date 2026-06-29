@@ -28,6 +28,8 @@ approval.cutover.workspace_demo.v1
 
 The MVP may store these as plain strings, but each reference must resolve to an object in the current workflow state or artifact store.
 
+The local artifact writer emits `artifacts/evidence_registry.json`, which maps generated evidence refs to the artifact, scenario, stage, producer, and content hash that support them.
+
 ## Evidence Registry Entry
 
 ```json

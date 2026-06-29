@@ -1,4 +1,4 @@
-.PHONY: test db-up db-reset db-down db-logs validate-scenario schema-diff enforce-gate draft-runbook eval-scenarios
+.PHONY: test db-up db-reset db-down db-logs validate-scenario schema-diff enforce-gate draft-runbook run-api run-workflow write-artifacts eval-scenarios
 
 PYTHON ?= $(shell if [ -x .venv/bin/python ]; then echo .venv/bin/python; else echo python3; fi)
 SCENARIO ?= clean_migration
@@ -25,6 +25,15 @@ enforce-gate:
 
 draft-runbook:
 	@$(PYTHON) -B scripts/generate_runbook.py $(SCENARIO)
+
+write-artifacts:
+	@$(PYTHON) -B scripts/write_artifacts.py
+
+run-workflow:
+	@$(PYTHON) -B scripts/run_workflow.py
+
+run-api:
+	@$(PYTHON) -B scripts/serve_api.py
 
 eval-scenarios:
 	@$(PYTHON) -B scripts/run_eval.py

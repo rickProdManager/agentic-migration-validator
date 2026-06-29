@@ -2,6 +2,20 @@
 
 Artifacts are structured outputs produced by workflow stages and advisors. The MVP may store them as JSON and Markdown files.
 
+The local artifact writer stores reproducible demo outputs under `artifacts/`:
+
+```text
+artifacts/
+  evidence_registry.json
+  eval_report.json
+  manifest.json
+  scenarios/
+    failed_checksum/
+      runbook.json
+```
+
+The `artifacts/` directory is intentionally ignored by git. The committed source contains the writer, validators, and tests; generated outputs can be reproduced from Docker fixtures.
+
 ## Common Artifact Metadata
 
 ```json
@@ -26,6 +40,8 @@ Allowed `status` values:
 - `rejected`
 - `accepted`
 - `published`
+
+The `content_hash` is calculated over the JSON artifact with `metadata.content_hash` excluded. Any post-generation edit must be followed by revalidation or regeneration.
 
 ## Discovery Artifact
 
@@ -186,3 +202,43 @@ Runbook drafts may set `model_calls` to `enabled` only when live prose has been 
   ]
 }
 ```
+
+## Evidence Registry
+
+The evidence registry resolves evidence references used by generated artifacts to concrete artifact bundle entries.
+
+```json
+{
+  "metadata": {},
+  "registry_version": "evidence_registry.v1",
+  "entry_count": 1,
+  "entries": [
+    {
+      "evidence_ref": "validation.checksum.public.customers.v1",
+      "workspace_id": "workspace_demo",
+      "scenario_id": "failed_checksum",
+      "source_type": "validation_result",
+      "stage": "validation",
+      "producer": "eval_runner",
+      "source_artifact_id": "artifact.eval_report.fixture_suite.v1",
+      "source_artifact_path": "eval_report.json",
+      "content_hash": "sha256:example"
+    }
+  ]
+}
+```
+
+## Artifact Validation
+
+Generated artifacts must pass deterministic validation before they are written:
+
+- Common metadata fields are present.
+- `format` is `json`.
+- `status` and `model_calls` use known values.
+- `metadata.evidence_refs` is present and non-empty.
+- `metadata.content_hash` matches the artifact content.
+- Runbook artifacts include `boundary_validation.passed=true`.
+- Runbook claims include claim-level evidence refs.
+- Eval report artifacts include scenario results, gate results, and matching `scenario_count`.
+- Evidence registry artifacts include unique entries with source artifact pointers.
+- When an evidence registry is present, non-registry artifact metadata evidence refs must resolve to registry entries.

@@ -1,6 +1,8 @@
 # Initial API Contract
 
-The MVP backend will expose a local API for scenario setup, workflow execution, approvals, artifacts, risk reports, and evals. This document is the Day 1 contract; endpoint names may evolve once implementation begins.
+The MVP backend will expose a local API for scenario setup, workflow execution, approvals, artifacts, risk reports, and evals. This document is the initial contract; endpoint names may evolve as implementation expands.
+
+The current implementation includes a local workflow response contract via `make run-workflow` and a dependency-free local JSON API via `make run-api`. This is not the full FastAPI backend yet; it is the local surface the future backend can replace or wrap.
 
 ## Conventions
 
@@ -38,6 +40,52 @@ The MVP backend will expose a local API for scenario setup, workflow execution, 
 }
 ```
 
+### Workflow Run
+
+```json
+{
+  "workflow_run_id": "workflow.fixture_validation.20260629_120000",
+  "workflow_version": "fixture_validation_workflow.v1",
+  "workspace_id": "workspace_demo",
+  "status": "completed",
+  "current_stage": "artifacts_written",
+  "model_calls": "disabled",
+  "scenario_ids": ["clean_migration", "failed_checksum"],
+  "started_at": "2026-06-29T12:00:00Z",
+  "completed_at": "2026-06-29T12:01:00Z",
+  "steps": [
+    {
+      "step": "run_deterministic_evals",
+      "status": "completed",
+      "model_calls": "disabled"
+    },
+    {
+      "step": "generate_runbook_drafts",
+      "status": "completed",
+      "model_calls": "disabled"
+    },
+    {
+      "step": "validate_artifact_bundle",
+      "status": "completed",
+      "model_calls": "disabled"
+    },
+    {
+      "step": "write_artifact_bundle",
+      "status": "completed",
+      "model_calls": "disabled"
+    }
+  ],
+  "artifact_refs": [
+    "artifact.eval_report.fixture_suite.v1",
+    "artifact.evidence_registry.fixture_suite.v1"
+  ],
+  "workflow_validation": {
+    "passed": true,
+    "issues": []
+  }
+}
+```
+
 ### Artifact
 
 ```json
@@ -65,6 +113,8 @@ Returns service health and version.
 }
 ```
 
+Implemented by `make run-api`.
+
 ### `GET /scenarios`
 
 Lists available fixture scenarios.
@@ -80,6 +130,8 @@ Lists available fixture scenarios.
   ]
 }
 ```
+
+Implemented by `make run-api`.
 
 ### `POST /workspaces`
 
@@ -135,6 +187,15 @@ Request:
 }
 ```
 
+Implemented local equivalents:
+
+```sh
+make run-workflow
+make run-api
+```
+
+`make run-workflow` emits the workflow run shape above and includes the generated artifact manifest inline. `make run-api` exposes this through `POST /workflows/run`.
+
 Response:
 
 ```json
@@ -146,6 +207,54 @@ Response:
   "artifact_refs": ["artifact.validation_report.v1"]
 }
 ```
+
+### `POST /workflows/run`
+
+Runs the local fixture workflow and returns the implemented workflow run response.
+
+Optional query string:
+
+```text
+scenario_id=failed_checksum&scenario_id=schema_drift
+```
+
+Response:
+
+```json
+{
+  "workflow_run_id": "workflow.fixture_validation.20260629_120000",
+  "workflow_version": "fixture_validation_workflow.v1",
+  "workspace_id": "workspace_demo",
+  "status": "completed",
+  "current_stage": "artifacts_written",
+  "workflow_validation": {
+    "passed": true,
+    "issues": []
+  },
+  "artifact_manifest": {
+    "passed": true,
+    "artifact_count": 6
+  }
+}
+```
+
+Implemented by `make run-api`.
+
+### `GET /artifacts/latest-manifest`
+
+Returns `artifacts/manifest.json` after a workflow or artifact run has produced it.
+
+Response:
+
+```json
+{
+  "passed": true,
+  "artifact_count": 6,
+  "artifacts": []
+}
+```
+
+Implemented by `make run-api`.
 
 ### `POST /workspaces/{workspace_id}/approvals`
 
@@ -245,4 +354,3 @@ Response:
   }
 }
 ```
-

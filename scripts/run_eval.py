@@ -30,7 +30,13 @@ FIXTURE_GATE_CONTEXT = GateContext(
 
 
 def main(argv: list[str]) -> int:
-    scenario_ids = argv[1:] or _default_scenario_ids()
+    scenario_ids = argv[1:] or default_scenario_ids()
+    report = run_evals(scenario_ids)
+    print(json.dumps(report, indent=2, sort_keys=True))
+    return 0 if report["passed"] else 1
+
+
+def run_evals(scenario_ids: list[str]) -> dict[str, Any]:
     scenario_results = []
 
     for scenario_id in scenario_ids:
@@ -69,11 +75,10 @@ def main(argv: list[str]) -> int:
         "passed": all(result["passed"] for result in scenario_results),
         "scenarios": scenario_results,
     }
-    print(json.dumps(report, indent=2, sort_keys=True))
-    return 0 if report["passed"] else 1
+    return report
 
 
-def _default_scenario_ids() -> list[str]:
+def default_scenario_ids() -> list[str]:
     return sorted(path.parent.name for path in SCENARIOS_ROOT.glob("*/scenario.json"))
 
 

@@ -718,9 +718,11 @@ Phase two positioning:
 
 > Model-backed advisors operate through governed tools rather than raw database access, and the same validation capabilities can be shared across agentic clients through MCP.
 
-## 12. Timeline
+## 12. Implementation Roadmap
 
-### Day 1: Product and Repo Foundation
+This roadmap is capability-sequenced, not calendar-sequenced. Milestones should ship when their contracts, tests, and demo paths are ready.
+
+### Product and Repo Foundation
 
 - Finalize PRD and MVP boundaries.
 - Create repo structure.
@@ -742,7 +744,7 @@ Deliverables:
 - evidence-reference spec
 - structured finding schema with `record_type`, `risk_axis`, and `finding_key`
 
-### Days 2-3: PostgreSQL Fixtures and Tooling
+### PostgreSQL Fixtures and Tooling
 
 - Add Docker Compose for source and target PostgreSQL.
 - Add read-only database roles for validation tools.
@@ -762,7 +764,7 @@ Deliverables:
 - read-only database access path
 - structured detector findings
 
-### Days 4-5: Workflow Orchestration
+### Workflow Orchestration
 
 - Implement workflow state model.
 - Implement Discovery Stage.
@@ -780,7 +782,7 @@ Deliverables:
 - audit log output
 - evidence-linked report artifacts
 
-### Day 6: Human Approval Gates and Guardrails
+### Human Approval Gates and Guardrails
 
 - Add approval states.
 - Pause workflow before risky stages.
@@ -798,7 +800,7 @@ Deliverables:
 - reviewer critique examples
 - rejected artifact examples
 
-### Days 7-8: Frontend Dashboard
+### Frontend Dashboard
 
 - Build Vite React migration workspace view.
 - Build workflow timeline.
@@ -813,7 +815,7 @@ Deliverables:
 - working local dashboard
 - complete demo path for at least three scenarios
 
-### Day 9: Evaluation Harness
+### Evaluation Harness
 
 - Add expected results fixtures.
 - Implement eval runner.
@@ -833,7 +835,7 @@ Deliverables:
 - expected-results JSON schema
 - explicit clean and replication-lag expected-results fixtures
 
-### Day 10: Documentation and Demo Polish
+### Documentation and Demo Polish
 
 - Finalize README.
 - Add architecture diagram.

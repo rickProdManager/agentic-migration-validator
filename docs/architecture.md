@@ -56,18 +56,21 @@ Humans may edit workflow inputs and approvals. They cannot edit gate outputs dir
 
 Deterministic stages perform database inspection, schema comparison, validation checks, compatibility rule matching, risk scoring, evidence validation, and gate evaluation.
 
-Initial deterministic tools:
+Implemented deterministic tools:
 
-- `db_introspection.py`
+- `schema_introspection.py`
 - `schema_diff.py`
-- `compatibility_rules.py`
-- `data_validation.py`
+- `schema_policy.py`
+- `checksum_validation.py`
 - `checksum.py`
+- `eval_runner.py`
+- `gatekeeper.py`
+- `artifacts.py`
+- `workflow.py`
+- `api.py`
 - `risk_scoring.py`
-- `report_writer.py`
-- `audit_log.py`
 
-Only `risk_scoring.py` exists today. The remaining tools are Day 2+ implementation targets.
+Future deterministic targets include broader compatibility rules, additional data validation detectors, persisted audit logging, and the full backend orchestration layer.
 
 ### Model-Backed Advisors
 
@@ -122,4 +125,3 @@ Planned artifact groups:
 - LLM-authored confidence is not accepted as evidence.
 - Evidence reference validation confirms citation existence, not semantic proof.
 - High-stakes readiness, cutover, rollback, and validation claims are protected by deterministic gate functions.
-
