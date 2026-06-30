@@ -48,6 +48,10 @@ Open `http://127.0.0.1:8080/`.
 
 The dashboard is dependency-free and served by the same local API process. Generated `artifacts/` and `runs/` directories are ignored by git because they are reproducible local outputs.
 
+## Screenshot
+
+![Agentic Migration Validator dashboard overview](docs/assets/dashboard-overview.png)
+
 ## Dashboard Demo
 
 Use this path when showing the project to a reviewer:
@@ -122,6 +126,8 @@ PostgreSQL cutover readiness reads only `migration_integrity` and `process_contr
 
 ```text
 docs/
+  assets/
+    dashboard-overview.png
   api-contract.md
   architecture.md
   artifact-schemas.md
