@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+from urllib.parse import urlparse
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
@@ -38,11 +39,16 @@ def live_model_config_from_env(env: dict[str, str] | None = None) -> LiveModelCo
     if not model:
         raise LiveModelError("OPENAI_MODEL is required when RUNBOOK_MODEL_CALLS=enabled")
 
+    endpoint = values.get("OPENAI_RESPONSES_URL", OPENAI_RESPONSES_URL)
+    parsed_endpoint = urlparse(endpoint)
+    if parsed_endpoint.scheme != "https":
+        raise LiveModelError("OPENAI_RESPONSES_URL must use https")
+
     return LiveModelConfig(
         provider=provider,
         model=model,
         api_key=api_key,
-        endpoint=values.get("OPENAI_RESPONSES_URL", OPENAI_RESPONSES_URL),
+        endpoint=endpoint,
     )
 
 
@@ -73,8 +79,7 @@ def generate_openai_text(
         with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except urllib.error.HTTPError as error:
-        body = error.read().decode("utf-8", errors="replace")
-        raise LiveModelError(f"OpenAI request failed with HTTP {error.code}: {body}") from error
+        raise LiveModelError(f"OpenAI request failed with HTTP {error.code}") from error
     except urllib.error.URLError as error:
         raise LiveModelError(f"OpenAI request failed: {error.reason}") from error
 

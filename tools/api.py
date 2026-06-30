@@ -73,7 +73,6 @@ def workflow_run_failed_response(error: Exception) -> tuple[int, dict[str, Any]]
     )
     payload["error"]["details"] = {
         "exception": error.__class__.__name__,
-        "message": str(error),
         "recovery_hint": "Run make db-up, then retry the workflow launch.",
     }
     return status, payload

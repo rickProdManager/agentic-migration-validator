@@ -99,7 +99,7 @@ class ApiTest(unittest.TestCase):
         self.assertEqual(response["error"]["code"], "workflow_run_failed")
         self.assertIn("Docker fixture containers", response["error"]["message"])
         self.assertEqual(response["error"]["details"]["exception"], "ConnectionError")
-        self.assertEqual(response["error"]["details"]["message"], "database unavailable")
+        self.assertNotIn("message", response["error"]["details"])
         self.assertIn("make db-up", response["error"]["details"]["recovery_hint"])
 
     def test_latest_manifest_response_returns_404_when_missing(self):

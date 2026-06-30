@@ -38,6 +38,7 @@ from tools.api import (
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8080
+MAX_JSON_BODY_BYTES = 64 * 1024
 
 
 class WorkflowApiHandler(BaseHTTPRequestHandler):
@@ -146,6 +147,15 @@ class WorkflowApiHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         parsed = urlparse(self.path)
+        if _is_cross_site_post(self.headers.get("Origin"), self.headers.get("Host"), self.headers.get("Sec-Fetch-Site")):
+            status, payload = error_response(
+                "cross_site_post_rejected",
+                "Cross-site POST requests are not accepted by the local API.",
+                status=403,
+            )
+            self._write_json(status, payload)
+            return
+
         if parsed.path == "/workflows/run":
             query = parse_qs(parsed.query)
             scenario_ids = query.get("scenario_id") or default_scenario_ids()
@@ -190,6 +200,7 @@ class WorkflowApiHandler(BaseHTTPRequestHandler):
         body = json.dumps(payload, indent=2, sort_keys=True).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
+        self._write_security_headers()
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
@@ -207,17 +218,37 @@ class WorkflowApiHandler(BaseHTTPRequestHandler):
         body = path.read_bytes()
         self.send_response(200)
         self.send_header("Content-Type", _content_type(path))
+        self._write_security_headers()
+        if path.suffix == ".html":
+            self.send_header(
+                "Content-Security-Policy",
+                "default-src 'self'; connect-src 'self'; img-src 'self' data:; "
+                "style-src 'self'; script-src 'self'; base-uri 'none'; frame-ancestors 'none'",
+            )
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
 
     def _read_json_body(self) -> tuple[int, dict]:
-        length = int(self.headers.get("Content-Length", "0"))
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+        except ValueError:
+            return 400, error_response(
+                "invalid_content_length",
+                "Content-Length must be an integer.",
+                status=400,
+            )[1]
         if length == 0:
             return 400, error_response(
                 "invalid_json",
                 "Request body must be a JSON object.",
                 status=400,
+            )[1]
+        if length > MAX_JSON_BODY_BYTES:
+            return 413, error_response(
+                "request_body_too_large",
+                "Request body exceeds the local API limit.",
+                status=413,
             )[1]
 
         try:
@@ -237,6 +268,11 @@ class WorkflowApiHandler(BaseHTTPRequestHandler):
             )[1]
         return 200, payload
 
+    def _write_security_headers(self) -> None:
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.send_header("Cache-Control", "no-store")
+
 
 def _content_type(path: Path) -> str:
     if path.suffix == ".html":
@@ -254,6 +290,18 @@ def _is_relative_to(path: Path, parent: Path) -> bool:
     except ValueError:
         return False
     return True
+
+
+def _is_cross_site_post(origin: str | None, host: str | None, sec_fetch_site: str | None) -> bool:
+    if sec_fetch_site and sec_fetch_site.lower() == "cross-site":
+        return True
+    if not origin:
+        return False
+    if origin == "null" or not host:
+        return True
+
+    parsed_origin = urlparse(origin)
+    return parsed_origin.netloc != host or parsed_origin.scheme not in {"http", "https"}
 
 
 def _split_nested_workflow_route(path: str, segment: str) -> tuple[str, str]:

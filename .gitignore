@@ -5,6 +5,15 @@ __pycache__/
 *.egg-info/
 .venv/
 venv/
+.env
+.env.*
+!.env.example
+*.log
+.coverage
+coverage.xml
+htmlcov/
+*.sqlite
+*.db
 AGENTS.md
 current_status.md
 public/

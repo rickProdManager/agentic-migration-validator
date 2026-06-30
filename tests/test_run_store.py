@@ -89,8 +89,12 @@ class RunStoreTest(unittest.TestCase):
             )
             persisted_run = read_workflow_run(root, run["workflow_run_id"], output_root=output_root)
             snapshot_path = Path(persisted_run["artifact_manifest"]["artifacts"][0]["path"])
-            self.assertTrue(snapshot_path.is_file())
-            self.assertTrue(snapshot_path.is_relative_to(output_root))
+            self.assertFalse(snapshot_path.is_absolute())
+            self.assertTrue((root / snapshot_path).is_file())
+            self.assertTrue((root / snapshot_path).is_relative_to(output_root))
+            self.assertFalse(Path(manifest["workflow_run_path"]).is_absolute())
+            self.assertFalse(Path(manifest["audit_log_path"]).is_absolute())
+            self.assertFalse(Path(manifest["approvals_path"]).is_absolute())
             self.assertEqual(
                 read_audit_log(root, run["workflow_run_id"], output_root=output_root)[
                     "event_count"

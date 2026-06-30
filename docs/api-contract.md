@@ -240,7 +240,6 @@ Runtime failure error:
     "message": "Workflow run failed. Confirm Docker fixture containers are running and retry.",
     "details": {
       "exception": "ConnectionError",
-      "message": "database unavailable",
       "recovery_hint": "Run make db-up, then retry the workflow launch."
     }
   }

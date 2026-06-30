@@ -11,6 +11,14 @@ class FixtureManifestTest(unittest.TestCase):
     def load_json(self, path):
         return json.loads(path.read_text())
 
+    def test_docker_fixture_ports_bind_to_localhost(self):
+        compose = (PROJECT_ROOT / "docker-compose.yml").read_text()
+
+        self.assertIn('"127.0.0.1:55432:5432"', compose)
+        self.assertIn('"127.0.0.1:55433:5432"', compose)
+        self.assertNotIn('"55432:5432"', compose)
+        self.assertNotIn('"55433:5432"', compose)
+
     def test_scenario_declared_files_exist(self):
         for scenario_path in sorted(SCENARIOS_ROOT.glob("*/scenario.json")):
             with self.subTest(scenario=scenario_path.parent.name):

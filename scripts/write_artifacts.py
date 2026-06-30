@@ -40,14 +40,20 @@ def write_artifact_bundle(
     issues = validate_artifact_bundle(artifacts)
     if issues:
         return {
-            "artifact_dir": str(output_root),
+            "artifact_dir": _stored_path(output_root),
             "passed": False,
             "issues": [issue.to_dict() for issue in issues],
         }
 
-    written = write_json_artifacts(output_root, artifacts)
+    written = [
+        {
+            **entry,
+            "path": _stored_path(Path(entry["path"])),
+        }
+        for entry in write_json_artifacts(output_root, artifacts)
+    ]
     manifest = {
-        "artifact_dir": str(output_root),
+        "artifact_dir": _stored_path(output_root),
         "artifact_count": len(written),
         "passed": True,
         "artifacts": written,
@@ -107,6 +113,14 @@ def _artifact_root() -> Path:
         path = Path(configured)
         return path if path.is_absolute() else PROJECT_ROOT / path
     return PROJECT_ROOT / "artifacts"
+
+
+def _stored_path(path: Path) -> str:
+    resolved = path.resolve()
+    try:
+        return str(resolved.relative_to(PROJECT_ROOT.resolve()))
+    except ValueError:
+        return str(resolved)
 
 
 if __name__ == "__main__":

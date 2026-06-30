@@ -70,9 +70,9 @@ def write_run_state(
         "current_stage": workflow_run.get("current_stage"),
         "started_at": workflow_run.get("started_at"),
         "completed_at": workflow_run.get("completed_at"),
-        "workflow_run_path": str(workflow_path),
-        "audit_log_path": str(audit_log_path),
-        "approvals_path": str(approvals_path),
+        "workflow_run_path": _stored_path(project_root, workflow_path),
+        "audit_log_path": _stored_path(project_root, audit_log_path),
+        "approvals_path": _stored_path(project_root, approvals_path),
         "audit_event_count": len(audit_events),
         "approval_count": 0,
     }
@@ -328,11 +328,11 @@ def _snapshot_workflow_artifacts(
         snapshot_path = snapshot_root / relative_path
         snapshot_path.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(artifact_path, snapshot_path)
-        artifact_entry["path"] = str(snapshot_path)
+        artifact_entry["path"] = _stored_path(project_root, snapshot_path)
         updated_artifacts.append(artifact_entry)
 
     updated_manifest = dict(artifact_manifest)
-    updated_manifest["artifact_dir"] = str(snapshot_root)
+    updated_manifest["artifact_dir"] = _stored_path(project_root, snapshot_root)
     updated_manifest["artifacts"] = updated_artifacts
     updated_workflow_run = dict(workflow_run)
     updated_workflow_run["artifact_manifest"] = updated_manifest
@@ -345,3 +345,11 @@ def _is_relative_to(path: Path, parent: Path) -> bool:
     except ValueError:
         return False
     return True
+
+
+def _stored_path(project_root: Path, path: Path) -> str:
+    resolved = path.resolve()
+    try:
+        return str(resolved.relative_to(project_root.resolve()))
+    except ValueError:
+        return str(resolved)

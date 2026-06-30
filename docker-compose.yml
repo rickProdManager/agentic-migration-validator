@@ -7,7 +7,7 @@ services:
       POSTGRES_USER: validator_admin
       POSTGRES_PASSWORD: validator_admin
     ports:
-      - "55432:5432"
+      - "127.0.0.1:55432:5432"
     volumes:
       - source-postgres-data:/var/lib/postgresql/data
       - ./fixtures:/fixtures:ro
@@ -25,7 +25,7 @@ services:
       POSTGRES_USER: validator_admin
       POSTGRES_PASSWORD: validator_admin
     ports:
-      - "55433:5432"
+      - "127.0.0.1:55433:5432"
     volumes:
       - target-postgres-data:/var/lib/postgresql/data
       - ./fixtures:/fixtures:ro

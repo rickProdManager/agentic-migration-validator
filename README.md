@@ -139,6 +139,7 @@ docs/
   product-requirements.md
   risk-scoring-test-vectors.md
   runbook-advisor-boundary.md
+  security-audit.md
   structured-finding-schema.md
 tests/
   test_api.py

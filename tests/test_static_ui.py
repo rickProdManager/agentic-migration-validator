@@ -1,7 +1,13 @@
 import unittest
 from pathlib import Path
 
-from scripts.serve_api import UI_ROOT, _content_type, _is_relative_to
+from scripts.serve_api import (
+    MAX_JSON_BODY_BYTES,
+    UI_ROOT,
+    _content_type,
+    _is_cross_site_post,
+    _is_relative_to,
+)
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -53,6 +59,27 @@ class StaticUiTest(unittest.TestCase):
     def test_static_path_guard_rejects_parent_escape(self):
         self.assertTrue(_is_relative_to((UI_ROOT / "index.html").resolve(), UI_ROOT.resolve()))
         self.assertFalse(_is_relative_to(PROJECT_ROOT / "README.md", UI_ROOT.resolve()))
+
+    def test_cross_site_post_guard_rejects_browser_cross_origin_posts(self):
+        self.assertTrue(
+            _is_cross_site_post(
+                "https://example.com",
+                "127.0.0.1:8080",
+                "cross-site",
+            )
+        )
+        self.assertTrue(_is_cross_site_post("null", "127.0.0.1:8080", None))
+        self.assertFalse(
+            _is_cross_site_post(
+                "http://127.0.0.1:8080",
+                "127.0.0.1:8080",
+                "same-origin",
+            )
+        )
+        self.assertFalse(_is_cross_site_post(None, "127.0.0.1:8080", None))
+
+    def test_local_api_json_body_limit_is_defined(self):
+        self.assertEqual(MAX_JSON_BODY_BYTES, 64 * 1024)
 
 
 if __name__ == "__main__":

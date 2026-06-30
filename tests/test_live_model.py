@@ -30,6 +30,16 @@ class LiveModelTest(unittest.TestCase):
         self.assertEqual(config.api_key, "sk-test")
         self.assertEqual(config.endpoint, "https://example.invalid/responses")
 
+    def test_openai_config_requires_https_endpoint_override(self):
+        with self.assertRaisesRegex(LiveModelError, "must use https"):
+            live_model_config_from_env(
+                {
+                    "OPENAI_API_KEY": "sk-test",
+                    "OPENAI_MODEL": "gpt-example",
+                    "OPENAI_RESPONSES_URL": "http://example.invalid/responses",
+                }
+            )
+
     def test_openai_response_text_extraction(self):
         payload = {
             "output": [
