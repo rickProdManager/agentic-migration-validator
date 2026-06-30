@@ -12,6 +12,28 @@ The core product idea is simple: advisors propose, deterministic invariants disp
 - Evidence-bound runbook drafts whose claims must trace back to deterministic findings and gate results.
 - A local dashboard that launches workflow runs, persists audit-ready state, records approvals, and resolves artifact/evidence details.
 
+## Use Cases
+
+This project models the control layer around a database migration, not a one-click migration tool. The most important use cases are:
+
+| Use Case | What The System Does | Why It Matters |
+| --- | --- | --- |
+| Pre-cutover validation rehearsal | Compares PostgreSQL source and target fixtures, emits structured findings, and blocks readiness when data integrity fails. | A migration team can see whether the target is safe to promote before a cutover window. |
+| Post-migration data integrity check | Runs canonical row/table checksums and schema-triggered data checks after a migration run. | Row counts can match while values drift; canonical checks catch content differences that simple counts miss. |
+| Schema drift triage | Separates catalog differences from row-data impact, including cases where relaxed constraints are harmless versus integrity-breaking. | Reviewers can distinguish advisory schema differences from differences that should block readiness. |
+| Evidence-bound runbook drafting | Produces runbook sections and recommendations from deterministic findings and gate results, then validates that claims stay evidence-bound. | Advisors can summarize and explain, but they cannot invent readiness or talk past blocked gates. |
+| Audit-ready approval workflow | Records human approvals as auditable inputs while gate outputs remain recomputed derived state. | Humans can approve validation evidence, but they cannot manually flip the system into ready. |
+| Detector and gate regression suite | Runs seeded scenarios against expected findings, mismatch categories, and gate outcomes. | The project can prove that detectors catch intended failures and that the eval runner catches misses, false positives, and mismatches. |
+
+Concrete examples are included as local fixture scenarios:
+
+- `Clean Migration`: baseline source/target agreement.
+- `Failed Checksum`: row counts and schema match, but customer data changed.
+- `Schema Drift`: a target schema guarantee is relaxed, but row data still satisfies the original guarantee.
+- `Relaxed Unique Violation`: the same relaxed schema guarantee now contains duplicate target data, so the issue becomes blocking.
+
+This is intentionally local and credentials-free by default. It is useful for demonstrating migration readiness controls, deterministic gates, evidence-bound advisor behavior, and auditability; it is not a hosted production migration service or a live cutover runner.
+
 ## Quickstart
 
 Requirements:
@@ -364,14 +386,14 @@ make eval-scenarios
 
 The command resets Docker-managed source and target PostgreSQL databases for each scenario, runs checksum validation, runs schema introspection and schema-triggered data checks, compares produced findings to expected findings, and evaluates cutover/readiness gates. Model calls are disabled.
 
-The four implemented scenarios show the core pattern:
+The four implemented scenarios show the core migration use cases:
 
-| Scenario | What It Proves | Cutover/Ready |
-| --- | --- | --- |
-| `clean_migration` | Source and target data/schema match. No detector findings are emitted. | Allowed |
-| `failed_checksum` | Data content drift is caught by canonical checksums even when row counts match. | Blocked |
-| `schema_drift` | Schema differences can be structural or advisory without corrupting migrated data. Relaxed guarantees trigger row-data checks, and clean row data stays non-blocking. | Allowed |
-| `schema_relaxed_unique_violation` | The same relaxed unique constraint becomes a blocking integrity finding when target row data contains duplicates. | Blocked |
+| Scenario | Migration Situation | What It Proves | Cutover/Ready |
+| --- | --- | --- | --- |
+| `clean_migration` | A rehearsal where the migrated target matches the source. | Source and target data/schema match. No detector findings are emitted. | Allowed |
+| `failed_checksum` | A migration where counts and schema look fine, but migrated row content changed. | Data content drift is caught by canonical checksums even when row counts match. | Blocked |
+| `schema_drift` | A target schema differs from the source, but the rows still satisfy the original guarantee. | Schema differences can be structural or advisory without corrupting migrated data. Relaxed guarantees trigger row-data checks, and clean row data stays non-blocking. | Allowed |
+| `schema_relaxed_unique_violation` | The target drops a uniqueness guarantee and migrated rows now contain duplicates. | The same relaxed unique constraint becomes a blocking integrity finding when target row data contains duplicates. | Blocked |
 
 Read each scenario result through three fields:
 
