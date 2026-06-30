@@ -12,6 +12,7 @@ from tools.gatekeeper import REQUIRED_APPROVAL_BY_GATE
 
 APPROVAL_SCHEMA_VERSION = "approval_record.v1"
 ALLOWED_DECISIONS = {"approved", "rejected", "revoked"}
+REQUIRED_APPROVALS = tuple(sorted(set(REQUIRED_APPROVAL_BY_GATE.values())))
 REQUIRED_FIELDS = (
     "approval_id",
     "approval_schema_version",
@@ -54,8 +55,9 @@ def build_approval_record(
         raise ValueError(f"Unknown gate: {gate}")
 
     approval_type = REQUIRED_APPROVAL_BY_GATE[gate]
+    created_at_value = created_at or _utc_now()
     approval_id = f"approval.{approval_type}.{workspace_id}.{scenario_id}.v1"
-    audit_event_id = f"audit.{approval_id}.recorded.v1"
+    audit_event_id = f"audit.{approval_id}.{decision}.{_compact_timestamp(created_at_value)}.v1"
     record = {
         "approval_id": approval_id,
         "approval_schema_version": APPROVAL_SCHEMA_VERSION,
@@ -67,7 +69,7 @@ def build_approval_record(
         "actor": actor,
         "decision": decision,
         "status": "recorded",
-        "created_at": created_at or _utc_now(),
+        "created_at": created_at_value,
         "evidence_refs": _dedupe(evidence_refs),
         "audit_event_id": audit_event_id,
     }
@@ -83,6 +85,17 @@ def validate_approval_record(
     for field in REQUIRED_FIELDS:
         if field not in record:
             issues.append(ApprovalValidationIssue(field, "missing_field"))
+
+    for field in (
+        "approval_id",
+        "workflow_run_id",
+        "workspace_id",
+        "scenario_id",
+        "actor",
+        "created_at",
+    ):
+        if field in record and (not isinstance(record.get(field), str) or not record.get(field)):
+            issues.append(ApprovalValidationIssue(field, "invalid_string"))
 
     if record.get("approval_schema_version") != APPROVAL_SCHEMA_VERSION:
         issues.append(ApprovalValidationIssue("approval_schema_version", "invalid_schema_version"))
@@ -131,6 +144,21 @@ def effective_approvals(
     )
 
 
+def pending_approvals(
+    records: Iterable[Mapping[str, Any]],
+    *,
+    required_approvals: Iterable[str] = REQUIRED_APPROVALS,
+) -> tuple[str, ...]:
+    effective = set(effective_approvals(records))
+    return tuple(
+        sorted(
+            approval
+            for approval in required_approvals
+            if approval not in effective
+        )
+    )
+
+
 def build_approval_audit_event(record: Mapping[str, Any]) -> dict[str, Any]:
     return build_audit_event(
         audit_event_id=str(record["audit_event_id"]),
@@ -170,3 +198,13 @@ def _dedupe(values: Iterable[str]) -> list[str]:
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _compact_timestamp(value: str) -> str:
+    return (
+        value.replace("-", "")
+        .replace(":", "")
+        .replace(".", "")
+        .replace("Z", "")
+        .replace("T", "_")
+    )

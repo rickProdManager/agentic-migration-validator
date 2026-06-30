@@ -6,6 +6,11 @@ from dataclasses import dataclass
 from typing import Any, Mapping
 
 from tools.audit import build_audit_event
+from tools.transitions import (
+    StageTransitionResult,
+    build_transition_audit_event,
+    evaluate_stage_transition,
+)
 
 
 WORKFLOW_VERSION = "fixture_validation_workflow.v1"
@@ -22,6 +27,12 @@ STEP_AUDIT_ACTORS = {
     "generate_runbook_drafts": ("runbook_advisor", "advisor", "runbook"),
     "validate_artifact_bundle": ("artifact_validator", "system", "artifact_validation"),
     "write_artifact_bundle": ("artifact_writer", "system", "artifact_store"),
+}
+STEP_TARGET_STAGE = {
+    "run_deterministic_evals": "evaluation",
+    "generate_runbook_drafts": "runbook",
+    "validate_artifact_bundle": "artifact_validation",
+    "write_artifact_bundle": "artifacts_written",
 }
 
 
@@ -45,7 +56,7 @@ def build_fixture_workflow_run(
 
     passed = artifact_manifest.get("passed") is True
     status = "completed" if passed else "failed"
-    return {
+    workflow_run = {
         "workflow_run_id": _workflow_run_id(started_at),
         "workflow_version": WORKFLOW_VERSION,
         "workspace_id": WORKSPACE_ID,
@@ -59,6 +70,11 @@ def build_fixture_workflow_run(
         "artifact_refs": _artifact_refs(artifact_manifest),
         "artifact_manifest": dict(artifact_manifest),
     }
+    workflow_run["stage_transitions"] = [
+        result.to_dict()
+        for result in _fixture_stage_transition_results(workflow_run)
+    ]
+    return workflow_run
 
 
 def validate_workflow_run(workflow_run: Mapping[str, Any]) -> tuple[WorkflowValidationIssue, ...]:
@@ -74,6 +90,7 @@ def validate_workflow_run(workflow_run: Mapping[str, Any]) -> tuple[WorkflowVali
         "started_at",
         "completed_at",
         "steps",
+        "stage_transitions",
         "artifact_refs",
         "artifact_manifest",
     )
@@ -114,6 +131,20 @@ def validate_workflow_run(workflow_run: Mapping[str, Any]) -> tuple[WorkflowVali
         if manifest_passed and not workflow_run.get("artifact_refs"):
             issues.append(WorkflowValidationIssue("artifact_refs", "missing_artifact_refs"))
 
+    transitions = workflow_run.get("stage_transitions")
+    if not isinstance(transitions, list) or not transitions:
+        issues.append(WorkflowValidationIssue("stage_transitions", "missing_stage_transitions"))
+    else:
+        transition_allowed = [
+            transition.get("allowed")
+            for transition in transitions
+            if isinstance(transition, Mapping)
+        ]
+        if workflow_run.get("status") == "completed" and not all(transition_allowed):
+            issues.append(WorkflowValidationIssue("stage_transitions", "blocked_transition"))
+        if workflow_run.get("status") == "failed" and all(transition_allowed):
+            issues.append(WorkflowValidationIssue("stage_transitions", "missing_blocked_transition"))
+
     return tuple(issues)
 
 
@@ -126,9 +157,16 @@ def build_fixture_workflow_audit_log(
     scenario_id = scenario_ids[0] if len(scenario_ids) == 1 else "fixture_suite"
     created_at = str(workflow_run.get("completed_at") or workflow_run.get("started_at"))
     events = []
+    transition_results = {
+        result.to_stage: result
+        for result in _fixture_stage_transition_results(workflow_run)
+    }
     for step in workflow_run.get("steps", []):
         step_name = str(step.get("step"))
         actor_name, actor_type, stage = STEP_AUDIT_ACTORS[step_name]
+        transition_result = transition_results.get(STEP_TARGET_STAGE[step_name])
+        if transition_result is not None:
+            events.append(build_transition_audit_event(transition_result, workflow_run))
         step_status = str(step.get("status"))
         decision = _audit_decision(step_name, step_status)
         event = build_audit_event(
@@ -149,6 +187,21 @@ def build_fixture_workflow_audit_log(
         )
         events.append(event)
     return events
+
+
+def _fixture_stage_transition_results(
+    workflow_run: Mapping[str, Any],
+) -> list[StageTransitionResult]:
+    cursor = dict(workflow_run)
+    cursor["current_stage"] = "not_started"
+    results = []
+    for to_stage in ("evaluation", "runbook", "artifact_validation", "artifacts_written"):
+        result = evaluate_stage_transition(cursor, to_stage)
+        results.append(result)
+        if not result.allowed:
+            break
+        cursor["current_stage"] = to_stage
+    return results
 
 
 def _steps(passed: bool) -> list[dict[str, Any]]:

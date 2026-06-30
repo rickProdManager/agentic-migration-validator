@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Agentic Migration Validator</title>
+    <link rel="stylesheet" href="/ui/styles.css">
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar" aria-label="Scenarios">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false">
+              <path d="M4 7.5c0-2.2 3.6-4 8-4s8 1.8 8 4-3.6 4-8 4-8-1.8-8-4Z"></path>
+              <path d="M4 7.5v4.2c0 2.2 3.6 4 8 4s8-1.8 8-4V7.5"></path>
+              <path d="M4 11.7V16c0 2.2 3.6 4 8 4s8-1.8 8-4v-4.3"></path>
+            </svg>
+          </div>
+          <div>
+            <h1>Agentic Migration Validator</h1>
+            <p id="api-status">Checking API</p>
+          </div>
+        </div>
+        <div class="sidebar-section sidebar-runs">
+          <label class="section-label" for="run-select">Runs</label>
+          <select id="run-select" class="run-select"></select>
+        </div>
+        <div class="sidebar-section sidebar-launch">
+          <div class="section-label">New Run</div>
+          <form id="launch-form" class="launch-form">
+            <div id="launch-scenario-list" class="launch-scenario-list"></div>
+            <button id="launch-submit-button" class="action-button sidebar-action" type="submit">Run Workflow</button>
+            <div id="launch-status" class="sidebar-status">Ready</div>
+          </form>
+        </div>
+        <div class="sidebar-section sidebar-scenarios">
+          <div class="section-label">Run Scenarios</div>
+          <div id="scenario-list" class="scenario-list"></div>
+        </div>
+      </aside>
+
+      <main class="workspace">
+        <header class="topbar">
+          <div>
+            <div class="eyebrow">Workflow Readiness</div>
+            <h2 id="run-title">Latest Run</h2>
+          </div>
+          <button id="refresh-button" class="icon-button" type="button" aria-label="Refresh data" title="Refresh data">
+            <svg viewBox="0 0 24 24" focusable="false">
+              <path d="M20 12a8 8 0 1 1-2.3-5.7"></path>
+              <path d="M20 4v5h-5"></path>
+            </svg>
+          </button>
+        </header>
+
+        <section id="notice" class="notice" hidden></section>
+
+        <section class="metric-grid" aria-label="Workflow metrics">
+          <article class="metric">
+            <span class="metric-label">Workflow</span>
+            <strong id="metric-workflow">-</strong>
+          </article>
+          <article class="metric">
+            <span class="metric-label">Scenarios</span>
+            <strong id="metric-scenarios">-</strong>
+          </article>
+          <article class="metric">
+            <span class="metric-label">Approvals</span>
+            <strong id="metric-approvals">-</strong>
+          </article>
+          <article class="metric">
+            <span class="metric-label">Audit Events</span>
+            <strong id="metric-audit">-</strong>
+          </article>
+        </section>
+
+        <section class="summary-grid" aria-label="Workflow summary">
+          <section class="panel">
+            <div class="panel-heading">
+              <h3>Run Result</h3>
+              <span id="result-status" class="muted">-</span>
+            </div>
+            <div id="result-summary-list" class="summary-list"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-heading">
+              <h3>Workflow Progress</h3>
+              <span id="progress-count" class="muted">-</span>
+            </div>
+            <div id="workflow-step-list" class="progress-list"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-heading">
+              <h3>Stage Transitions</h3>
+              <span id="transition-count" class="muted">-</span>
+            </div>
+            <div id="transition-list" class="progress-list"></div>
+          </section>
+        </section>
+
+        <section class="layout-grid">
+          <div class="primary-column">
+            <section class="panel">
+              <div class="panel-heading">
+                <h3>Readiness Gates</h3>
+                <span id="selected-scenario-label" class="muted">-</span>
+              </div>
+              <div id="gate-grid" class="gate-grid"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-heading">
+                <h3>Findings</h3>
+                <span id="finding-count" class="muted">-</span>
+              </div>
+              <div id="finding-list" class="finding-list"></div>
+            </section>
+          </div>
+
+          <div class="secondary-column">
+            <section class="panel">
+              <div class="panel-heading">
+                <h3>Approval State</h3>
+                <span id="approval-count" class="muted">-</span>
+              </div>
+              <div id="approval-state" class="chip-list"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-heading">
+                <h3>Approval Action</h3>
+                <span id="approval-action-status" class="muted">-</span>
+              </div>
+              <form id="approval-form" class="approval-form">
+                <label>
+                  <span>Approval</span>
+                  <select id="approval-type-select"></select>
+                </label>
+                <label>
+                  <span>Evidence</span>
+                  <select id="approval-evidence-select"></select>
+                </label>
+                <label>
+                  <span>Actor</span>
+                  <input id="approval-actor-input" type="text" value="human.reviewer">
+                </label>
+                <label>
+                  <span>Notes</span>
+                  <textarea id="approval-notes-input" rows="3">Reviewed deterministic outputs.</textarea>
+                </label>
+                <button id="approval-submit-button" class="action-button" type="submit">Approve</button>
+              </form>
+            </section>
+
+            <section class="panel">
+              <div class="panel-heading">
+                <h3>Run Artifacts</h3>
+                <span id="artifact-count" class="muted">-</span>
+              </div>
+              <div id="artifact-list" class="artifact-list"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-heading">
+                <h3>Audit Trail</h3>
+                <span id="audit-count" class="muted">-</span>
+              </div>
+              <div id="audit-list" class="audit-list"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="detail-grid" aria-label="Workflow detail">
+          <section class="panel">
+            <div class="panel-heading">
+              <h3>Artifact Detail</h3>
+              <span id="runbook-status" class="muted">-</span>
+            </div>
+            <div class="detail-body">
+              <div id="runbook-title" class="detail-title">-</div>
+              <div id="runbook-sections" class="section-stack"></div>
+              <div id="runbook-evidence-list" class="evidence-ref-list"></div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-heading">
+              <h3>Evidence Reference</h3>
+              <span id="evidence-stage" class="muted">-</span>
+            </div>
+            <div id="evidence-detail" class="detail-body"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-heading">
+              <h3>Audit Event</h3>
+              <span id="audit-detail-status" class="muted">-</span>
+            </div>
+            <div id="audit-detail" class="detail-body"></div>
+          </section>
+        </section>
+      </main>
+    </div>
+    <script src="/ui/app.js" defer></script>
+  </body>
+</html>

@@ -6,7 +6,7 @@ The core product idea is simple: advisors propose, deterministic invariants disp
 
 ## Current Status
 
-The deterministic validation spine is implemented. The product requirements and architecture contracts are drafted, risk scoring is available, checksum validation runs against Docker PostgreSQL fixtures, eval matching is calibrated, schema introspection emits structured findings, gatekeeper checks enforce cutover/readiness state, runbook drafts remain evidence-bound, local workflow runs persist API-readable state with audit events, and approval/transition scaffolding is available as deterministic helpers.
+The deterministic validation spine is implemented. The product requirements and architecture contracts are drafted, risk scoring is available, checksum validation runs against Docker PostgreSQL fixtures, eval matching is calibrated, schema introspection emits structured findings, gatekeeper checks enforce cutover/readiness state, runbook drafts remain evidence-bound, local workflow runs persist API-readable state with audit events and artifact snapshots, approvals persist as auditable run inputs, workflow responses include deterministic stage transition checks, readiness views recompute gates from persisted approvals plus fixture findings, and the local dashboard exposes workflow launch, run history, result/progress summaries, approval submission, runbook, evidence, artifact, and audit drilldowns.
 
 Implemented capabilities:
 
@@ -26,9 +26,11 @@ Implemented capabilities:
 - Dependency-free local JSON API surface in `tools/api.py`
 - Local workflow run response in `tools/workflow.py`
 - Audit event validation in `tools/audit.py`
-- Local workflow run and audit-log persistence in `tools/run_store.py`
-- Human approval records in `tools/approvals.py`
+- Local workflow run, audit-log, and artifact-snapshot persistence in `tools/run_store.py`
+- Human approval records and pending/effective approval state in `tools/approvals.py`
 - Explicit stage transition checks in `tools/transitions.py`
+- Approval-aware readiness views in `tools/readiness.py`
+- Local dashboard in `ui/` with workflow launch, run history, result/progress/transition summaries, approval controls, readiness, artifact, evidence, and audit drilldowns
 - Risk scoring test vectors in `docs/risk-scoring-test-vectors.md`
 - Unit tests in `tests/`
 - Foundation specs for architecture, findings, evidence references, gatekeeper invariants, fixtures, artifacts, audit events, and the initial API
@@ -38,10 +40,8 @@ Implemented capabilities:
 Not implemented yet:
 
 - Additional data validation detectors beyond checksum
-- Full workflow orchestration
-- Approval submission API routes
 - Full FastAPI backend
-- Vite React dashboard
+- Fuller backend workflow orchestration and async progress streaming
 
 ## MVP Scope
 
@@ -81,11 +81,13 @@ tests/
   test_fixtures.py
   test_gatekeeper.py
   test_risk_scoring.py
+  test_readiness.py
   test_runbook_advisor.py
   test_run_store.py
   test_schema_diff.py
   test_schema_introspection.py
   test_schema_policy.py
+  test_static_ui.py
   test_transitions.py
   test_workflow.py
 tools/
@@ -98,6 +100,7 @@ tools/
   eval_runner.py
   gatekeeper.py
   risk_scoring.py
+  readiness.py
   runbook_advisor.py
   run_store.py
   schema_diff.py
@@ -108,6 +111,10 @@ tools/
 fixtures/
   base/
   scenarios/
+ui/
+  index.html
+  styles.css
+  app.js
 scripts/
   diff_schema.py
   generate_runbook.py
@@ -203,7 +210,7 @@ Run the local fixture workflow:
 make run-workflow
 ```
 
-This emits an API-shaped workflow response with step status, scenario IDs, artifact refs, workflow validation, audit validation, run-state metadata, and the artifact manifest. It writes generated state under `runs/`, which is ignored by git.
+This emits an API-shaped workflow response with step status, scenario IDs, artifact refs, stage transition checks, workflow validation, audit validation, run-state metadata, and the artifact manifest. It writes generated state under `runs/`, which is ignored by git.
 
 Serve the local JSON API:
 
@@ -211,16 +218,26 @@ Serve the local JSON API:
 make run-api
 ```
 
+The same server renders the local dashboard at `http://127.0.0.1:8080/`. The dashboard launches fixture workflows, shows workflow result/progress/transition summaries, workflow readiness, approvals, blocking findings, persisted runs, artifact snapshots, evidence references, runbook sections, and selected audit-event details from the JSON routes below. Approval controls submit auditable records through the API; gate outputs remain derived state.
+
 Implemented routes:
 
+- `GET /`
+- `GET /ui/{asset}`
 - `GET /health`
 - `GET /scenarios`
 - `GET /artifacts/latest-manifest`
 - `GET /artifacts/{artifact_id}`
 - `GET /evidence/{evidence_ref}`
+- `GET /workflows`
 - `GET /workflows/latest`
 - `GET /workflows/{workflow_run_id}`
+- `GET /workflows/{workflow_run_id}/artifacts/{artifact_id}`
+- `GET /workflows/{workflow_run_id}/evidence/{evidence_ref}`
 - `GET /workflows/{workflow_run_id}/audit`
+- `GET /workflows/{workflow_run_id}/approvals`
+- `GET /workflows/{workflow_run_id}/readiness`
+- `POST /workflows/{workflow_run_id}/approvals`
 - `POST /workflows/run`
 
 Smoke-test the running local API:
@@ -305,12 +322,12 @@ That command exits nonzero because the checksum mismatch blocks readiness. The s
 
 ## Next Milestone
 
-The next milestone should wire approval and transition controls into the persisted workflow/API layer:
+The next milestone should move from a working local loop toward better operational clarity:
 
-- API routes for submitting approvals and reading pending decisions
-- Persisted approval records alongside workflow run state
-- Transition-aware workflow responses that refuse invalid state changes
-- Preserve the invariant that gate outputs are recomputed, not edited
+- Add clearer run status/progress states for launched workflows
+- Add a concise workflow result summary after launch
+- Consider replacing the stdlib server with a FastAPI backend only if it preserves the same contracts and static UI
+- Keep gate outputs derived from state, never edited directly
 
 ## Design Boundary
 

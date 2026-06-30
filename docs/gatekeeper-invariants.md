@@ -122,7 +122,7 @@ Compatibility advisory findings are reported separately and cannot block readine
   "status": "recorded",
   "created_at": "2026-06-25T12:00:00Z",
   "evidence_refs": ["artifact.validation_report.v1", "artifact.risk_report.v1"],
-  "audit_event_id": "audit.approval.cutover_recommendation.workspace_demo.failed_checksum.v1.recorded.v1",
+  "audit_event_id": "audit.approval.cutover_recommendation.workspace_demo.failed_checksum.v1.approved.20260625_120000.v1",
   "notes": "Approved for demo after reviewing failed checksum evidence."
 }
 ```

@@ -33,7 +33,7 @@ The executable contract lives in `tools/audit.py`.
   "input_summary": "Compared source and target public.customers checksums.",
   "output_summary": "Checksum mismatch detected for public.customers.",
   "gate": "can_mark_ready",
-  "approval_id": "approval.ready.workspace_demo.v1",
+  "approval_id": "approval.ready.workspace_demo.failed_checksum.v1",
   "severity": "high",
   "confidence_basis": "Exact full-table checksum over all rows.",
   "metadata": {

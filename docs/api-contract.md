@@ -2,7 +2,7 @@
 
 The MVP backend will expose a local API for scenario setup, workflow execution, approvals, artifacts, risk reports, and evals. This document is the initial contract; endpoint names may evolve as implementation expands.
 
-The current implementation includes a local workflow response contract via `make run-workflow` and a dependency-free local JSON API via `make run-api`. This is not the full FastAPI backend yet; it is the local surface the future backend can replace or wrap.
+The current implementation includes a local workflow response contract via `make run-workflow`, a dependency-free local JSON API via `make run-api`, and a local dashboard served from the same process with run history, launch controls, result summaries, approval inputs, and artifact/evidence/audit drilldowns. This is not the full FastAPI backend yet; it is the local surface the future backend can replace or wrap.
 
 ## Conventions
 
@@ -194,7 +194,7 @@ make run-workflow
 make run-api
 ```
 
-`make run-workflow` emits the workflow run shape above, includes the generated artifact manifest inline, and persists local run state under `runs/`. `make run-api` exposes this through `POST /workflows/run` and retrieval routes for latest run state and audit logs.
+`make run-workflow` emits the workflow run shape above, includes the generated artifact manifest inline, snapshots referenced artifacts under `runs/`, and persists local run state. `make run-api` exposes this through `POST /workflows/run`, retrieval routes for run history, latest run state, workflow-scoped artifact/evidence lookup, audit logs, and a dashboard at `/` with workflow launch controls, result/progress/transition summaries, runbook, artifact, evidence, readiness, approval, and audit drilldowns.
 
 Response:
 
@@ -220,13 +220,29 @@ scenario_id=failed_checksum&scenario_id=schema_drift
 
 Unknown `scenario_id` values are rejected before workflow execution.
 
-Error:
+Unknown scenario error:
 
 ```json
 {
   "error": {
     "code": "unknown_scenario",
     "message": "Unknown scenario_id: missing_scenario"
+  }
+}
+```
+
+Runtime failure error:
+
+```json
+{
+  "error": {
+    "code": "workflow_run_failed",
+    "message": "Workflow run failed. Confirm Docker fixture containers are running and retry.",
+    "details": {
+      "exception": "ConnectionError",
+      "message": "database unavailable",
+      "recovery_hint": "Run make db-up, then retry the workflow launch."
+    }
   }
 }
 ```
@@ -240,11 +256,37 @@ Response:
   "workspace_id": "workspace_demo",
   "status": "completed",
   "current_stage": "artifacts_written",
+  "stage_transitions": [
+    {
+      "from_stage": "not_started",
+      "to_stage": "evaluation",
+      "allowed": true,
+      "unmet_prerequisites": []
+    },
+    {
+      "from_stage": "evaluation",
+      "to_stage": "runbook",
+      "allowed": true,
+      "unmet_prerequisites": []
+    },
+    {
+      "from_stage": "runbook",
+      "to_stage": "artifact_validation",
+      "allowed": true,
+      "unmet_prerequisites": []
+    },
+    {
+      "from_stage": "artifact_validation",
+      "to_stage": "artifacts_written",
+      "allowed": true,
+      "unmet_prerequisites": []
+    }
+  ],
   "workflow_validation": {
     "passed": true,
     "issues": []
   },
-  "audit_event_count": 4,
+  "audit_event_count": 8,
   "audit_validation": {
     "passed": true,
     "issues": []
@@ -256,8 +298,34 @@ Response:
   "run_state": {
     "passed": true,
     "workflow_run_id": "workflow.fixture_validation.20260629_120000",
-    "audit_event_count": 4
+    "audit_event_count": 8,
+    "approval_count": 0
   }
+}
+```
+
+Implemented by `make run-api`.
+
+### `GET /workflows`
+
+Returns persisted workflow run manifests, newest first.
+
+Response:
+
+```json
+{
+  "run_count": 1,
+  "latest_workflow_run_id": "workflow.fixture_validation.20260629_120000",
+  "runs": [
+    {
+      "run_store_version": "local_run_store.v1",
+      "passed": true,
+      "workflow_run_id": "workflow.fixture_validation.20260629_120000",
+      "audit_event_count": 8,
+      "approval_count": 0,
+      "is_latest": true
+    }
+  ]
 }
 ```
 
@@ -275,7 +343,8 @@ Response:
     "run_store_version": "local_run_store.v1",
     "passed": true,
     "workflow_run_id": "workflow.fixture_validation.20260629_120000",
-    "audit_event_count": 4
+    "audit_event_count": 8,
+    "approval_count": 0
   },
   "workflow_run": {
     "workflow_run_id": "workflow.fixture_validation.20260629_120000",
@@ -305,6 +374,46 @@ Response:
 
 Implemented by `make run-api`.
 
+### `GET /workflows/{workflow_run_id}/artifacts/{artifact_id}`
+
+Returns one generated artifact by ID using the selected workflow run's artifact manifest. This avoids mixing a historical run with the latest artifact bundle.
+
+Response:
+
+```json
+{
+  "artifact_id": "artifact.runbook_draft.failed_checksum.v1",
+  "path": "runs/workflow.fixture_validation.20260629_120000/artifacts/scenarios/failed_checksum/runbook.json",
+  "content_hash": "sha256:example",
+  "metadata": {
+    "artifact_type": "runbook",
+    "scenario_id": "failed_checksum"
+  },
+  "content": {}
+}
+```
+
+Implemented by `make run-api`.
+
+### `GET /workflows/{workflow_run_id}/evidence/{evidence_ref}`
+
+Resolves an evidence reference through the selected workflow run's evidence registry artifact.
+
+Response:
+
+```json
+{
+  "evidence_ref": "validation.checksum.public.customers.v1",
+  "entry": {
+    "source_artifact_id": "artifact.eval_report.fixture_suite.v1",
+    "source_artifact_path": "eval_report.json",
+    "content_hash": "sha256:example"
+  }
+}
+```
+
+Implemented by `make run-api`.
+
 ### `GET /workflows/{workflow_run_id}/audit`
 
 Returns the persisted audit log for one workflow run.
@@ -315,8 +424,136 @@ Response:
 {
   "audit_schema_version": "audit_event.v1",
   "workflow_run_id": "workflow.fixture_validation.20260629_120000",
-  "event_count": 4,
+  "event_count": 8,
   "events": []
+}
+```
+
+Implemented by `make run-api`.
+
+### `GET /workflows/{workflow_run_id}/approvals`
+
+Returns persisted approval records, effective approvals, and pending approval types for one workflow run.
+
+Response:
+
+```json
+{
+  "approval_schema_version": "approval_record.v1",
+  "workflow_run_id": "workflow.fixture_validation.20260629_120000",
+  "approval_count": 1,
+  "effective_approvals": ["validation_acceptance"],
+  "pending_approvals": [
+    "cutover_recommendation",
+    "final_planning",
+    "ready",
+    "rollback_recommendation"
+  ],
+  "approvals": []
+}
+```
+
+Implemented by `make run-api`.
+
+### `GET /workflows/{workflow_run_id}/readiness`
+
+Returns approval-aware gate results for each scenario in a persisted workflow run. The view is derived from persisted approval records plus eval-report findings; it does not store or edit gate outputs.
+
+Response:
+
+```json
+{
+  "workflow_run_id": "workflow.fixture_validation.20260629_120000",
+  "workspace_id": "workspace_demo",
+  "status": "completed",
+  "current_stage": "artifacts_written",
+  "approval_state": {
+    "approval_count": 1,
+    "effective_approvals": ["validation_acceptance"],
+    "pending_approvals": [
+      "cutover_recommendation",
+      "final_planning",
+      "ready",
+      "rollback_recommendation"
+    ]
+  },
+  "scenario_count": 1,
+  "scenarios": [
+    {
+      "scenario_id": "failed_checksum",
+      "cutover_ready": false,
+      "migration_ready": false,
+      "blocked_gates": [
+        "can_generate_final_plan",
+        "can_recommend_cutover",
+        "can_recommend_rollback",
+        "can_mark_ready"
+      ],
+      "gate_results": {
+        "can_accept_validation": {
+          "gate": "can_accept_validation",
+          "allowed": true,
+          "blocking_findings": [],
+          "missing_approvals": [],
+          "unresolved_evidence_refs": [],
+          "unmet_prerequisites": []
+        },
+        "can_recommend_cutover": {
+          "gate": "can_recommend_cutover",
+          "allowed": false,
+          "blocking_findings": ["validation.checksum_mismatch:public.customers:*"],
+          "missing_approvals": ["cutover_recommendation"],
+          "unresolved_evidence_refs": [],
+          "unmet_prerequisites": []
+        }
+      }
+    }
+  ]
+}
+```
+
+Implemented by `make run-api`.
+
+### `POST /workflows/{workflow_run_id}/approvals`
+
+Submits a human approval decision for one workflow run. The approval is persisted under `runs/`, and an `approval_recorded` audit event is appended to that run's audit log.
+
+Request:
+
+```json
+{
+  "gate": "can_accept_validation",
+  "decision": "approved",
+  "actor": "human.reviewer",
+  "notes": "Validation reviewed for demo.",
+  "evidence_refs": ["artifact.eval_report.fixture_suite.v1"]
+}
+```
+
+Response:
+
+```json
+{
+  "approval": {
+    "approval_id": "approval.validation_acceptance.workspace_demo.failed_checksum.v1",
+    "approval_schema_version": "approval_record.v1",
+    "workflow_run_id": "workflow.fixture_validation.20260629_120000",
+    "workspace_id": "workspace_demo",
+    "scenario_id": "failed_checksum",
+    "gate": "can_accept_validation",
+    "approval_type": "validation_acceptance",
+    "actor": "human.reviewer",
+    "decision": "approved",
+    "status": "recorded",
+    "evidence_refs": ["artifact.eval_report.fixture_suite.v1"]
+  },
+  "effective_approvals": ["validation_acceptance"],
+  "pending_approvals": [
+    "cutover_recommendation",
+    "final_planning",
+    "ready",
+    "rollback_recommendation"
+  ]
 }
 ```
 
@@ -377,31 +614,6 @@ Response:
 ```
 
 Implemented by `make run-api`.
-
-### `POST /workspaces/{workspace_id}/approvals`
-
-Submits a human approval decision.
-
-Request:
-
-```json
-{
-  "gate": "validation_acceptance",
-  "decision": "approved",
-  "actor": "human.reviewer",
-  "notes": "Validation reviewed for demo.",
-  "evidence_refs": ["artifact.validation_report.v1"]
-}
-```
-
-Response:
-
-```json
-{
-  "approval_id": "approval.validation_acceptance.workspace_demo.v1",
-  "status": "recorded"
-}
-```
 
 ### `GET /workspaces/{workspace_id}/findings`
 

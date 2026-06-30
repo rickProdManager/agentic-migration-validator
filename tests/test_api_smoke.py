@@ -32,13 +32,17 @@ class ApiSmokeTest(unittest.TestCase):
                 "unknown_scenario",
                 "workflow_run",
                 "workflow_latest",
+                "workflow_runs",
                 "workflow_audit",
                 "artifact_retrieval",
+                "approval_submission",
+                "approval_retrieval",
+                "approval_aware_readiness",
                 "evidence_retrieval",
             ],
         )
 
-    def fake_request(self, method, url):
+    def fake_request(self, method, url, payload=None):
         if method == "GET" and url == "http://api.test/health":
             return 200, {"status": "ok", "version": "0.1.0"}
         if method == "GET" and url == "http://api.test/scenarios":
@@ -64,6 +68,20 @@ class ApiSmokeTest(unittest.TestCase):
                     }
                 },
             )
+        if method == "GET" and url == "http://api.test/workflows":
+            return (
+                200,
+                {
+                    "run_count": 1,
+                    "latest_workflow_run_id": "workflow.fixture_validation.20260630_120000",
+                    "runs": [
+                        {
+                            "workflow_run_id": "workflow.fixture_validation.20260630_120000",
+                            "is_latest": True,
+                        }
+                    ],
+                },
+            )
         if method == "GET" and url.endswith("/audit"):
             return (
                 200,
@@ -71,6 +89,42 @@ class ApiSmokeTest(unittest.TestCase):
                     "workflow_run_id": "workflow.fixture_validation.20260630_120000",
                     "event_count": 4,
                     "events": [],
+                },
+            )
+        if method == "POST" and url.endswith("/approvals"):
+            self.assertEqual(payload["gate"], "can_accept_validation")
+            return (
+                201,
+                {
+                    "approval": {"approval_type": "validation_acceptance"},
+                    "effective_approvals": ["validation_acceptance"],
+                },
+            )
+        if method == "GET" and url.endswith("/approvals"):
+            return (
+                200,
+                {
+                    "approval_count": 1,
+                    "effective_approvals": ["validation_acceptance"],
+                    "pending_approvals": [],
+                },
+            )
+        if method == "GET" and url.endswith("/readiness"):
+            return (
+                200,
+                {
+                    "approval_state": {
+                        "effective_approvals": ["validation_acceptance"]
+                    },
+                    "scenario_count": 1,
+                    "scenarios": [
+                        {
+                            "gate_results": {
+                                "can_accept_validation": {"allowed": True},
+                                "can_recommend_cutover": {"allowed": False},
+                            }
+                        }
+                    ],
                 },
             )
         if method == "GET" and "/artifacts/" in url:

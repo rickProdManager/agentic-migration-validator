@@ -5,9 +5,9 @@
 Agentic Migration Validator is a local workflow application for validating database migration readiness. The phase-one architecture keeps deterministic tooling in charge of facts, checks, scoring, and safety gates while reserving model-backed advisors for synthesis and review.
 
 ```text
-Vite React dashboard
+Dependency-free local dashboard
         |
-FastAPI backend
+Local JSON API / future FastAPI backend
         |
 Workflow orchestrator
         |
@@ -24,9 +24,9 @@ JSON and Markdown artifacts
 
 ### Frontend
 
-The frontend will open directly into a migration workspace. It should show the selected scenario, workflow timeline, findings, validation evidence, risk scores, runbook preview, audit log, and approval controls.
+The frontend opens directly into a migration workspace. The current dashboard launches fixture workflows, shows persisted runs, scenarios, workflow state, result/progress/transition summaries, readiness gates, blocking findings, artifacts, approvals, audit events, runbook sections, evidence reference resolution, and selected audit-event details. Approval controls submit auditable records through the backend; gate outputs remain derived state. Future UI work can add richer visual polish and async progress streaming.
 
-The UI does not own gate state. It renders gate outputs computed by the backend and submits human approval decisions or accepted-risk decisions as auditable workflow inputs.
+The UI does not own gate state. It renders gate outputs computed by the backend. Approval and future accepted-risk controls must submit auditable workflow inputs rather than editing gate outputs.
 
 ### Backend API
 
@@ -68,13 +68,14 @@ Implemented deterministic tools:
 - `artifacts.py`
 - `audit.py`
 - `approvals.py`
+- `readiness.py`
 - `transitions.py`
 - `workflow.py`
 - `run_store.py`
 - `api.py`
 - `risk_scoring.py`
 
-Future deterministic targets include broader compatibility rules, additional data validation detectors, approval API persistence, transition-aware workflow execution, and the full backend orchestration layer.
+Future deterministic targets include broader compatibility rules, additional data validation detectors, richer runtime failure handling, and the full backend orchestration layer.
 
 ### Model-Backed Advisors
 
@@ -110,7 +111,7 @@ The tool layer should be stable enough to expose through MCP in phase two withou
 
 ## Artifact Storage
 
-Markdown and JSON artifacts are sufficient for the MVP. The default implementation writes artifacts and workflow runs under workspace-local directories, then can add database persistence later only if it improves resumability.
+Markdown and JSON artifacts are sufficient for the MVP. The default implementation writes artifacts under workspace-local directories and snapshots referenced artifacts under each persisted workflow run. It can add database persistence later only if it improves resumability.
 
 Planned artifact groups:
 

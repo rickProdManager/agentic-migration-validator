@@ -62,6 +62,11 @@ class WorkflowTest(unittest.TestCase):
             ],
         )
         self.assertEqual({step["status"] for step in run["steps"]}, {"completed"})
+        self.assertEqual(
+            [transition["to_stage"] for transition in run["stage_transitions"]],
+            ["evaluation", "runbook", "artifact_validation", "artifacts_written"],
+        )
+        self.assertTrue(all(transition["allowed"] for transition in run["stage_transitions"]))
         self.assertEqual(validate_workflow_run(run), ())
 
     def test_build_fixture_workflow_audit_log_links_artifacts(self):
@@ -75,7 +80,7 @@ class WorkflowTest(unittest.TestCase):
         events = build_fixture_workflow_audit_log(run)
         write_event = events[-1]
 
-        self.assertEqual(len(events), 4)
+        self.assertEqual(len(events), 8)
         self.assertEqual(validate_audit_log(events), ())
         self.assertEqual(write_event["decision"], "artifact_generated")
         self.assertEqual(write_event["scenario_id"], "failed_checksum")
@@ -100,6 +105,8 @@ class WorkflowTest(unittest.TestCase):
         self.assertEqual(run["current_stage"], "artifact_validation")
         self.assertEqual(steps["validate_artifact_bundle"], "failed")
         self.assertEqual(steps["write_artifact_bundle"], "skipped")
+        self.assertFalse(run["stage_transitions"][-1]["allowed"])
+        self.assertEqual(run["stage_transitions"][-1]["to_stage"], "artifacts_written")
         self.assertEqual(validate_workflow_run(run), ())
 
     def test_build_fixture_workflow_audit_log_marks_skipped_write_blocked(self):
@@ -114,6 +121,7 @@ class WorkflowTest(unittest.TestCase):
 
         self.assertEqual(events[-1]["status"], "blocked")
         self.assertEqual(events[-1]["decision"], "stage_completed")
+        self.assertIn("transition_blocked", [event["decision"] for event in events])
         self.assertEqual(validate_audit_log(events), ())
 
     def test_validate_workflow_run_rejects_completed_run_without_passed_manifest(self):
