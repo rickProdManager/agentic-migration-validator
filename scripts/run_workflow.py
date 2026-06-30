@@ -13,7 +13,13 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from scripts.run_eval import default_scenario_ids
 from scripts.write_artifacts import write_artifact_bundle
-from tools.workflow import build_fixture_workflow_run, validate_workflow_run
+from tools.audit import validate_audit_log
+from tools.run_store import write_run_state
+from tools.workflow import (
+    build_fixture_workflow_audit_log,
+    build_fixture_workflow_run,
+    validate_workflow_run,
+)
 
 
 def main(argv: list[str]) -> int:
@@ -23,7 +29,7 @@ def main(argv: list[str]) -> int:
     return 0 if workflow_run["status"] == "completed" else 1
 
 
-def run_fixture_workflow(scenario_ids: list[str]) -> dict:
+def run_fixture_workflow(scenario_ids: list[str], *, persist: bool = True) -> dict:
     started_at = _utc_now()
     artifact_manifest = write_artifact_bundle(scenario_ids)
     completed_at = _utc_now()
@@ -42,6 +48,20 @@ def run_fixture_workflow(scenario_ids: list[str]) -> dict:
         }
     else:
         workflow_run["workflow_validation"] = {"passed": True, "issues": []}
+
+    audit_events = build_fixture_workflow_audit_log(workflow_run)
+    audit_issues = validate_audit_log(audit_events)
+    workflow_run["audit_event_count"] = len(audit_events)
+    workflow_run["audit_validation"] = {
+        "passed": not audit_issues,
+        "issues": [issue.to_dict() for issue in audit_issues],
+    }
+    if persist:
+        workflow_run["run_state"] = write_run_state(
+            PROJECT_ROOT,
+            workflow_run,
+            audit_events,
+        )
     return workflow_run
 
 

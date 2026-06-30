@@ -136,6 +136,28 @@ def build_evidence_registry_payload(
     }
 
 
+def evidence_registry_entries(registry: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]:
+    entries = registry.get("entries")
+    if not isinstance(entries, list):
+        return {}
+
+    entries_by_ref: dict[str, Mapping[str, Any]] = {}
+    for entry in entries:
+        if not isinstance(entry, Mapping):
+            continue
+        evidence_ref = entry.get("evidence_ref")
+        if isinstance(evidence_ref, str) and evidence_ref and evidence_ref not in entries_by_ref:
+            entries_by_ref[evidence_ref] = entry
+    return entries_by_ref
+
+
+def resolve_evidence_ref(
+    registry: Mapping[str, Any],
+    evidence_ref: str,
+) -> Mapping[str, Any] | None:
+    return evidence_registry_entries(registry).get(evidence_ref)
+
+
 def validate_artifact(artifact: Mapping[str, Any]) -> tuple[ArtifactValidationIssue, ...]:
     issues: list[ArtifactValidationIssue] = []
     metadata = artifact.get("metadata")
@@ -323,18 +345,13 @@ def _validate_bundle_evidence_resolution(
     if registry is None:
         return []
 
-    registry_refs = {
-        entry.get("evidence_ref")
-        for entry in registry.get("entries", [])
-        if isinstance(entry, Mapping)
-    }
     issues = []
     for path, artifact in artifacts.items():
         metadata = artifact.get("metadata", {})
         if metadata.get("artifact_type") == "evidence_registry":
             continue
         for evidence_ref in metadata.get("evidence_refs", []):
-            if evidence_ref not in registry_refs:
+            if resolve_evidence_ref(registry, evidence_ref) is None:
                 issues.append(
                     ArtifactValidationIssue(
                         path=f"{path}.metadata.evidence_refs",

@@ -91,6 +91,7 @@ def _run_workflow_checks(
     scenario = urllib.parse.quote(workflow_scenario, safe="")
     status, payload = request("POST", f"{base_url}/workflows/run?scenario_id={scenario}")
     manifest = payload.get("artifact_manifest", {})
+    workflow_run_id = payload.get("workflow_run_id")
     _add_check(
         checks,
         "workflow_run",
@@ -102,6 +103,33 @@ def _run_workflow_checks(
             "status": status,
             "workflow_status": payload.get("status"),
             "artifact_count": manifest.get("artifact_count"),
+        },
+    )
+
+    status, payload = request("GET", f"{base_url}/workflows/latest")
+    _add_check(
+        checks,
+        "workflow_latest",
+        status == 200
+        and payload.get("run_manifest", {}).get("workflow_run_id") == workflow_run_id,
+        {
+            "status": status,
+            "workflow_run_id": payload.get("run_manifest", {}).get("workflow_run_id"),
+        },
+    )
+
+    audit_path = urllib.parse.quote(str(workflow_run_id), safe="")
+    status, payload = request("GET", f"{base_url}/workflows/{audit_path}/audit")
+    _add_check(
+        checks,
+        "workflow_audit",
+        status == 200
+        and payload.get("workflow_run_id") == workflow_run_id
+        and payload.get("event_count", 0) > 0,
+        {
+            "status": status,
+            "workflow_run_id": payload.get("workflow_run_id"),
+            "event_count": payload.get("event_count"),
         },
     )
 

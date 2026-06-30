@@ -1,6 +1,11 @@
 import unittest
 
-from tools.workflow import build_fixture_workflow_run, validate_workflow_run
+from tools.audit import validate_audit_log
+from tools.workflow import (
+    build_fixture_workflow_audit_log,
+    build_fixture_workflow_run,
+    validate_workflow_run,
+)
 
 
 PASSED_MANIFEST = {
@@ -59,6 +64,29 @@ class WorkflowTest(unittest.TestCase):
         self.assertEqual({step["status"] for step in run["steps"]}, {"completed"})
         self.assertEqual(validate_workflow_run(run), ())
 
+    def test_build_fixture_workflow_audit_log_links_artifacts(self):
+        run = build_fixture_workflow_run(
+            scenario_ids=["failed_checksum"],
+            artifact_manifest=PASSED_MANIFEST,
+            started_at="2026-06-29T12:00:00Z",
+            completed_at="2026-06-29T12:01:00Z",
+        )
+
+        events = build_fixture_workflow_audit_log(run)
+        write_event = events[-1]
+
+        self.assertEqual(len(events), 4)
+        self.assertEqual(validate_audit_log(events), ())
+        self.assertEqual(write_event["decision"], "artifact_generated")
+        self.assertEqual(write_event["scenario_id"], "failed_checksum")
+        self.assertEqual(
+            write_event["artifact_ids"],
+            [
+                "artifact.eval_report.fixture_suite.v1",
+                "artifact.evidence_registry.fixture_suite.v1",
+            ],
+        )
+
     def test_build_fixture_workflow_run_surfaces_artifact_validation_failure(self):
         run = build_fixture_workflow_run(
             scenario_ids=["failed_checksum"],
@@ -73,6 +101,20 @@ class WorkflowTest(unittest.TestCase):
         self.assertEqual(steps["validate_artifact_bundle"], "failed")
         self.assertEqual(steps["write_artifact_bundle"], "skipped")
         self.assertEqual(validate_workflow_run(run), ())
+
+    def test_build_fixture_workflow_audit_log_marks_skipped_write_blocked(self):
+        run = build_fixture_workflow_run(
+            scenario_ids=["failed_checksum"],
+            artifact_manifest=FAILED_MANIFEST,
+            started_at="2026-06-29T12:00:00Z",
+            completed_at="2026-06-29T12:01:00Z",
+        )
+
+        events = build_fixture_workflow_audit_log(run)
+
+        self.assertEqual(events[-1]["status"], "blocked")
+        self.assertEqual(events[-1]["decision"], "stage_completed")
+        self.assertEqual(validate_audit_log(events), ())
 
     def test_validate_workflow_run_rejects_completed_run_without_passed_manifest(self):
         run = build_fixture_workflow_run(

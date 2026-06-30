@@ -194,7 +194,7 @@ make run-workflow
 make run-api
 ```
 
-`make run-workflow` emits the workflow run shape above and includes the generated artifact manifest inline. `make run-api` exposes this through `POST /workflows/run`.
+`make run-workflow` emits the workflow run shape above, includes the generated artifact manifest inline, and persists local run state under `runs/`. `make run-api` exposes this through `POST /workflows/run` and retrieval routes for latest run state and audit logs.
 
 Response:
 
@@ -244,10 +244,79 @@ Response:
     "passed": true,
     "issues": []
   },
+  "audit_event_count": 4,
+  "audit_validation": {
+    "passed": true,
+    "issues": []
+  },
   "artifact_manifest": {
     "passed": true,
     "artifact_count": 6
+  },
+  "run_state": {
+    "passed": true,
+    "workflow_run_id": "workflow.fixture_validation.20260629_120000",
+    "audit_event_count": 4
   }
+}
+```
+
+Implemented by `make run-api`.
+
+### `GET /workflows/latest`
+
+Returns the latest persisted workflow run and its local run manifest.
+
+Response:
+
+```json
+{
+  "run_manifest": {
+    "run_store_version": "local_run_store.v1",
+    "passed": true,
+    "workflow_run_id": "workflow.fixture_validation.20260629_120000",
+    "audit_event_count": 4
+  },
+  "workflow_run": {
+    "workflow_run_id": "workflow.fixture_validation.20260629_120000",
+    "status": "completed",
+    "current_stage": "artifacts_written"
+  }
+}
+```
+
+Implemented by `make run-api`.
+
+### `GET /workflows/{workflow_run_id}`
+
+Returns one persisted workflow run by id.
+
+Response:
+
+```json
+{
+  "workflow_run": {
+    "workflow_run_id": "workflow.fixture_validation.20260629_120000",
+    "status": "completed",
+    "current_stage": "artifacts_written"
+  }
+}
+```
+
+Implemented by `make run-api`.
+
+### `GET /workflows/{workflow_run_id}/audit`
+
+Returns the persisted audit log for one workflow run.
+
+Response:
+
+```json
+{
+  "audit_schema_version": "audit_event.v1",
+  "workflow_run_id": "workflow.fixture_validation.20260629_120000",
+  "event_count": 4,
+  "events": []
 }
 ```
 

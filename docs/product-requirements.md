@@ -129,20 +129,30 @@ Every workflow stage, advisor, and tool action should emit structured audit even
 
 Required audit event fields:
 
+- audit event id
+- audit schema version
+- workflow run id
 - timestamp
 - workspace id
 - scenario id
 - actor name
 - actor type
 - stage
+- decision
+- status
+- evidence references
+- finding keys
+- artifact ids
+
+Optional audit event fields:
+
 - tool name, if applicable
 - input summary
 - output summary
-- evidence references
-- decision
+- gate, where applicable
+- approval id, where applicable
 - severity, where applicable
 - confidence basis, only when derived from deterministic evidence such as sample size, rule severity, or validation coverage
-- approval status, where applicable
 
 The workflow must validate evidence references before accepting artifacts. Any structured claim in a report, plan, risk explanation, or runbook must reference a tool output, validation result, or audit event. If a reference does not resolve, the artifact is rejected and the workflow remains blocked.
 

@@ -8,8 +8,11 @@ from tools.api import (
     evidence_response,
     health_response,
     latest_manifest_response,
+    latest_workflow_run_response,
     scenarios_response,
     validate_requested_scenarios,
+    workflow_audit_response,
+    workflow_run_response,
 )
 
 
@@ -215,6 +218,48 @@ class ApiTest(unittest.TestCase):
         self.assertEqual(status, 404)
         self.assertEqual(response["error"]["code"], "evidence_registry_not_found")
 
+    def test_latest_workflow_run_response_reads_latest_run(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            workflow_run = self.write_run_store(root)
+
+            status, response = latest_workflow_run_response(root)
+
+        self.assertEqual(status, 200)
+        self.assertEqual(
+            response["run_manifest"]["workflow_run_id"],
+            workflow_run["workflow_run_id"],
+        )
+        self.assertEqual(response["workflow_run"], workflow_run)
+
+    def test_workflow_run_response_reads_run_by_id(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            workflow_run = self.write_run_store(root)
+
+            status, response = workflow_run_response(root, workflow_run["workflow_run_id"])
+
+        self.assertEqual(status, 200)
+        self.assertEqual(response["workflow_run"], workflow_run)
+
+    def test_workflow_audit_response_reads_audit_log(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            workflow_run = self.write_run_store(root)
+
+            status, response = workflow_audit_response(root, workflow_run["workflow_run_id"])
+
+        self.assertEqual(status, 200)
+        self.assertEqual(response["workflow_run_id"], workflow_run["workflow_run_id"])
+        self.assertEqual(response["event_count"], 1)
+
+    def test_latest_workflow_run_response_returns_404_without_runs(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            status, response = latest_workflow_run_response(Path(tmpdir))
+
+        self.assertEqual(status, 404)
+        self.assertEqual(response["error"]["code"], "workflow_run_not_found")
+
     def write_artifact_store(self, root, *, manifest_artifacts, files):
         artifacts = root / "artifacts"
         artifacts.mkdir(parents=True, exist_ok=True)
@@ -231,6 +276,34 @@ class ApiTest(unittest.TestCase):
             path = artifacts / relative_path
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(json.dumps(content))
+
+    def write_run_store(self, root):
+        workflow_run_id = "workflow.fixture_validation.20260630_120000"
+        workflow_run = {
+            "workflow_run_id": workflow_run_id,
+            "status": "completed",
+            "current_stage": "artifacts_written",
+        }
+        audit_log = {
+            "audit_schema_version": "audit_event.v1",
+            "workflow_run_id": workflow_run_id,
+            "event_count": 1,
+            "events": [{"audit_event_id": "audit.workflow.v1"}],
+        }
+        run_dir = root / "runs" / workflow_run_id
+        run_dir.mkdir(parents=True)
+        (run_dir / "workflow_run.json").write_text(json.dumps(workflow_run))
+        (run_dir / "audit_log.json").write_text(json.dumps(audit_log))
+        manifest = {
+            "run_store_version": "local_run_store.v1",
+            "passed": True,
+            "workflow_run_id": workflow_run_id,
+            "workflow_run_path": str(run_dir / "workflow_run.json"),
+            "audit_log_path": str(run_dir / "audit_log.json"),
+            "audit_event_count": 1,
+        }
+        (root / "runs" / "latest.json").write_text(json.dumps(manifest))
+        return workflow_run
 
     def write_scenario(
         self,

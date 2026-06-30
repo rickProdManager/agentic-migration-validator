@@ -66,11 +66,15 @@ Implemented deterministic tools:
 - `eval_runner.py`
 - `gatekeeper.py`
 - `artifacts.py`
+- `audit.py`
+- `approvals.py`
+- `transitions.py`
 - `workflow.py`
+- `run_store.py`
 - `api.py`
 - `risk_scoring.py`
 
-Future deterministic targets include broader compatibility rules, additional data validation detectors, persisted audit logging, and the full backend orchestration layer.
+Future deterministic targets include broader compatibility rules, additional data validation detectors, approval API persistence, transition-aware workflow execution, and the full backend orchestration layer.
 
 ### Model-Backed Advisors
 
@@ -106,7 +110,7 @@ The tool layer should be stable enough to expose through MCP in phase two withou
 
 ## Artifact Storage
 
-Markdown and JSON artifacts are sufficient for the MVP. The default implementation should write artifacts under a workspace-local artifact directory, then add database persistence later only if it improves resumability.
+Markdown and JSON artifacts are sufficient for the MVP. The default implementation writes artifacts and workflow runs under workspace-local directories, then can add database persistence later only if it improves resumability.
 
 Planned artifact groups:
 

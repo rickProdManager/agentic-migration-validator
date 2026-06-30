@@ -6,6 +6,9 @@ import json
 from pathlib import Path
 from typing import Any
 
+from tools.artifacts import resolve_evidence_ref
+from tools.run_store import latest_run_manifest, read_audit_log, read_workflow_run
+
 
 API_VERSION = "0.1.0"
 
@@ -98,15 +101,63 @@ def evidence_response(project_root: Path, evidence_ref: str) -> tuple[int, dict[
         )
 
     registry = json.loads(registry_path.read_text())
-    for entry in registry.get("entries", []):
-        if entry.get("evidence_ref") == evidence_ref:
-            return 200, {"evidence_ref": evidence_ref, "entry": entry}
+    entry = resolve_evidence_ref(registry, evidence_ref)
+    if entry is not None:
+        return 200, {"evidence_ref": evidence_ref, "entry": entry}
 
     return error_response(
         "evidence_ref_not_found",
         f"No evidence registry entry found for evidence_ref {evidence_ref!r}.",
         status=404,
     )
+
+
+def latest_workflow_run_response(project_root: Path) -> tuple[int, dict[str, Any]]:
+    manifest = latest_run_manifest(project_root)
+    if manifest is None:
+        return error_response(
+            "workflow_run_not_found",
+            "Run the workflow before requesting workflow state.",
+            status=404,
+        )
+
+    workflow_run_id = str(manifest.get("workflow_run_id", ""))
+    workflow_run = read_workflow_run(project_root, workflow_run_id)
+    if workflow_run is None:
+        return error_response(
+            "workflow_run_not_found",
+            f"No workflow run found for workflow_run_id {workflow_run_id!r}.",
+            status=404,
+        )
+    return 200, {"run_manifest": manifest, "workflow_run": workflow_run}
+
+
+def workflow_run_response(
+    project_root: Path,
+    workflow_run_id: str,
+) -> tuple[int, dict[str, Any]]:
+    workflow_run = read_workflow_run(project_root, workflow_run_id)
+    if workflow_run is None:
+        return error_response(
+            "workflow_run_not_found",
+            f"No workflow run found for workflow_run_id {workflow_run_id!r}.",
+            status=404,
+        )
+    return 200, {"workflow_run": workflow_run}
+
+
+def workflow_audit_response(
+    project_root: Path,
+    workflow_run_id: str,
+) -> tuple[int, dict[str, Any]]:
+    audit_log = read_audit_log(project_root, workflow_run_id)
+    if audit_log is None:
+        return error_response(
+            "audit_log_not_found",
+            f"No audit log found for workflow_run_id {workflow_run_id!r}.",
+            status=404,
+        )
+    return 200, audit_log
 
 
 def error_response(code: str, message: str, *, status: int = 400) -> tuple[int, dict[str, Any]]:

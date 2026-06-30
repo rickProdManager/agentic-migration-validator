@@ -6,7 +6,7 @@ The core product idea is simple: advisors propose, deterministic invariants disp
 
 ## Current Status
 
-The deterministic validation spine is implemented. The product requirements and architecture contracts are drafted, risk scoring is available, checksum validation runs against Docker PostgreSQL fixtures, eval matching is calibrated, schema introspection emits structured findings, gatekeeper checks enforce cutover/readiness state, and runbook drafts remain evidence-bound.
+The deterministic validation spine is implemented. The product requirements and architecture contracts are drafted, risk scoring is available, checksum validation runs against Docker PostgreSQL fixtures, eval matching is calibrated, schema introspection emits structured findings, gatekeeper checks enforce cutover/readiness state, runbook drafts remain evidence-bound, local workflow runs persist API-readable state with audit events, and approval/transition scaffolding is available as deterministic helpers.
 
 Implemented capabilities:
 
@@ -25,6 +25,10 @@ Implemented capabilities:
 - Evidence registry generation and reference resolution for artifact bundles
 - Dependency-free local JSON API surface in `tools/api.py`
 - Local workflow run response in `tools/workflow.py`
+- Audit event validation in `tools/audit.py`
+- Local workflow run and audit-log persistence in `tools/run_store.py`
+- Human approval records in `tools/approvals.py`
+- Explicit stage transition checks in `tools/transitions.py`
 - Risk scoring test vectors in `docs/risk-scoring-test-vectors.md`
 - Unit tests in `tests/`
 - Foundation specs for architecture, findings, evidence references, gatekeeper invariants, fixtures, artifacts, audit events, and the initial API
@@ -35,6 +39,7 @@ Not implemented yet:
 
 - Additional data validation detectors beyond checksum
 - Full workflow orchestration
+- Approval submission API routes
 - Full FastAPI backend
 - Vite React dashboard
 
@@ -67,7 +72,9 @@ docs/
   structured-finding-schema.md
 tests/
   test_api.py
+  test_approvals.py
   test_artifacts.py
+  test_audit.py
   test_checksum.py
   test_checksum_validation.py
   test_eval_runner.py
@@ -75,12 +82,16 @@ tests/
   test_gatekeeper.py
   test_risk_scoring.py
   test_runbook_advisor.py
+  test_run_store.py
   test_schema_diff.py
   test_schema_introspection.py
   test_schema_policy.py
+  test_transitions.py
   test_workflow.py
 tools/
   api.py
+  approvals.py
+  audit.py
   artifacts.py
   checksum.py
   checksum_validation.py
@@ -88,9 +99,11 @@ tools/
   gatekeeper.py
   risk_scoring.py
   runbook_advisor.py
+  run_store.py
   schema_diff.py
   schema_introspection.py
   schema_policy.py
+  transitions.py
   workflow.py
 fixtures/
   base/
@@ -190,7 +203,7 @@ Run the local fixture workflow:
 make run-workflow
 ```
 
-This emits an API-shaped workflow response with step status, scenario IDs, artifact refs, workflow validation, and the artifact manifest. It is the local contract the future backend can wrap.
+This emits an API-shaped workflow response with step status, scenario IDs, artifact refs, workflow validation, audit validation, run-state metadata, and the artifact manifest. It writes generated state under `runs/`, which is ignored by git.
 
 Serve the local JSON API:
 
@@ -205,6 +218,9 @@ Implemented routes:
 - `GET /artifacts/latest-manifest`
 - `GET /artifacts/{artifact_id}`
 - `GET /evidence/{evidence_ref}`
+- `GET /workflows/latest`
+- `GET /workflows/{workflow_run_id}`
+- `GET /workflows/{workflow_run_id}/audit`
 - `POST /workflows/run`
 
 Smoke-test the running local API:
@@ -289,10 +305,12 @@ That command exits nonzero because the checksum mismatch blocks readiness. The s
 
 ## Next Milestone
 
-The next milestone should wrap the validated artifact layer:
+The next milestone should wire approval and transition controls into the persisted workflow/API layer:
 
-- Expand the local API only where the workflow needs it
-- Run adversarial live-model reviews for `failed_checksum` and `schema_relaxed_unique_violation`
+- API routes for submitting approvals and reading pending decisions
+- Persisted approval records alongside workflow run state
+- Transition-aware workflow responses that refuse invalid state changes
+- Preserve the invariant that gate outputs are recomputed, not edited
 
 ## Design Boundary
 

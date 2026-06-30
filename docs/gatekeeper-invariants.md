@@ -110,19 +110,26 @@ Compatibility advisory findings are reported separately and cannot block readine
 
 ```json
 {
-  "approval_id": "approval.cutover.workspace_demo.v1",
+  "approval_id": "approval.cutover_recommendation.workspace_demo.failed_checksum.v1",
+  "approval_schema_version": "approval_record.v1",
+  "workflow_run_id": "workflow.fixture_validation.20260630_120000",
   "workspace_id": "workspace_demo",
   "scenario_id": "failed_checksum",
-  "gate": "cutover_recommendation",
+  "gate": "can_recommend_cutover",
+  "approval_type": "cutover_recommendation",
   "actor": "human.reviewer",
   "decision": "approved",
+  "status": "recorded",
   "created_at": "2026-06-25T12:00:00Z",
   "evidence_refs": ["artifact.validation_report.v1", "artifact.risk_report.v1"],
+  "audit_event_id": "audit.approval.cutover_recommendation.workspace_demo.failed_checksum.v1.recorded.v1",
   "notes": "Approved for demo after reviewing failed checksum evidence."
 }
 ```
 
 Allowed `decision` values are `approved`, `rejected`, and `revoked`.
+
+Valid approved records are reduced to the approval names consumed by `GateContext`. Approval records are inputs to gate evaluation; they never set gate outputs directly.
 
 ## Accepted Risk
 

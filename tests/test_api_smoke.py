@@ -31,6 +31,8 @@ class ApiSmokeTest(unittest.TestCase):
                 "scenarios",
                 "unknown_scenario",
                 "workflow_run",
+                "workflow_latest",
+                "workflow_audit",
                 "artifact_retrieval",
                 "evidence_retrieval",
             ],
@@ -47,9 +49,28 @@ class ApiSmokeTest(unittest.TestCase):
             return (
                 200,
                 {
+                    "workflow_run_id": "workflow.fixture_validation.20260630_120000",
                     "status": "completed",
                     "workflow_validation": {"passed": True},
                     "artifact_manifest": {"passed": True, "artifact_count": 3},
+                },
+            )
+        if method == "GET" and url == "http://api.test/workflows/latest":
+            return (
+                200,
+                {
+                    "run_manifest": {
+                        "workflow_run_id": "workflow.fixture_validation.20260630_120000"
+                    }
+                },
+            )
+        if method == "GET" and url.endswith("/audit"):
+            return (
+                200,
+                {
+                    "workflow_run_id": "workflow.fixture_validation.20260630_120000",
+                    "event_count": 4,
+                    "events": [],
                 },
             )
         if method == "GET" and "/artifacts/" in url:

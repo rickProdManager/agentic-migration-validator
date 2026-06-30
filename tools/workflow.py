@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Mapping
 
+from tools.audit import build_audit_event
+
 
 WORKFLOW_VERSION = "fixture_validation_workflow.v1"
 WORKSPACE_ID = "workspace_demo"
@@ -15,6 +17,12 @@ STEP_NAMES = (
     "write_artifact_bundle",
 )
 KNOWN_STEP_STATUSES = {"completed", "failed", "skipped"}
+STEP_AUDIT_ACTORS = {
+    "run_deterministic_evals": ("eval_runner", "tool", "evaluation"),
+    "generate_runbook_drafts": ("runbook_advisor", "advisor", "runbook"),
+    "validate_artifact_bundle": ("artifact_validator", "system", "artifact_validation"),
+    "write_artifact_bundle": ("artifact_writer", "system", "artifact_store"),
+}
 
 
 @dataclass(frozen=True)
@@ -109,6 +117,40 @@ def validate_workflow_run(workflow_run: Mapping[str, Any]) -> tuple[WorkflowVali
     return tuple(issues)
 
 
+def build_fixture_workflow_audit_log(
+    workflow_run: Mapping[str, Any],
+) -> list[dict[str, Any]]:
+    workflow_run_id = str(workflow_run["workflow_run_id"])
+    workspace_id = str(workflow_run["workspace_id"])
+    scenario_ids = [str(value) for value in workflow_run.get("scenario_ids", [])]
+    scenario_id = scenario_ids[0] if len(scenario_ids) == 1 else "fixture_suite"
+    created_at = str(workflow_run.get("completed_at") or workflow_run.get("started_at"))
+    events = []
+    for step in workflow_run.get("steps", []):
+        step_name = str(step.get("step"))
+        actor_name, actor_type, stage = STEP_AUDIT_ACTORS[step_name]
+        step_status = str(step.get("status"))
+        decision = _audit_decision(step_name, step_status)
+        event = build_audit_event(
+            audit_event_id=f"audit.{workflow_run_id}.{step_name}.v1",
+            workflow_run_id=workflow_run_id,
+            workspace_id=workspace_id,
+            scenario_id=scenario_id,
+            actor_name=actor_name,
+            actor_type=actor_type,
+            stage=stage,
+            decision=decision,
+            status=_audit_status(step_status),
+            artifact_ids=_step_artifact_ids(step_name, workflow_run),
+            created_at=created_at,
+            input_summary=f"Executed workflow step {step_name}.",
+            output_summary=f"Workflow step {step_name} ended with status {step_status}.",
+            metadata={"step": step_name},
+        )
+        events.append(event)
+    return events
+
+
 def _steps(passed: bool) -> list[dict[str, Any]]:
     if passed:
         statuses = {
@@ -141,6 +183,32 @@ def _artifact_refs(artifact_manifest: Mapping[str, Any]) -> list[str]:
         for artifact in artifact_manifest.get("artifacts", [])
         if artifact.get("artifact_id")
     ]
+
+
+def _step_artifact_ids(
+    step_name: str,
+    workflow_run: Mapping[str, Any],
+) -> list[str]:
+    artifact_refs = list(workflow_run.get("artifact_refs", []))
+    if step_name == "run_deterministic_evals":
+        return [artifact_id for artifact_id in artifact_refs if ".eval_report." in artifact_id]
+    if step_name == "generate_runbook_drafts":
+        return [artifact_id for artifact_id in artifact_refs if ".runbook_draft." in artifact_id]
+    if step_name in {"validate_artifact_bundle", "write_artifact_bundle"}:
+        return artifact_refs
+    return []
+
+
+def _audit_decision(step_name: str, step_status: str) -> str:
+    if step_name == "write_artifact_bundle" and step_status == "completed":
+        return "artifact_generated"
+    return "stage_completed"
+
+
+def _audit_status(step_status: str) -> str:
+    if step_status == "skipped":
+        return "blocked"
+    return step_status
 
 
 def _workflow_run_id(started_at: str) -> str:

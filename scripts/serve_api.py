@@ -20,8 +20,11 @@ from tools.api import (
     evidence_response,
     health_response,
     latest_manifest_response,
+    latest_workflow_run_response,
     scenarios_response,
     validate_requested_scenarios,
+    workflow_audit_response,
+    workflow_run_response,
 )
 
 
@@ -52,6 +55,20 @@ class WorkflowApiHandler(BaseHTTPRequestHandler):
         if parsed.path.startswith("/evidence/"):
             evidence_ref = unquote(parsed.path.removeprefix("/evidence/"))
             status, payload = evidence_response(PROJECT_ROOT, evidence_ref)
+            self._write_json(status, payload)
+            return
+        if parsed.path == "/workflows/latest":
+            status, payload = latest_workflow_run_response(PROJECT_ROOT)
+            self._write_json(status, payload)
+            return
+        if parsed.path.startswith("/workflows/") and parsed.path.endswith("/audit"):
+            workflow_run_id = unquote(parsed.path.removeprefix("/workflows/").removesuffix("/audit"))
+            status, payload = workflow_audit_response(PROJECT_ROOT, workflow_run_id)
+            self._write_json(status, payload)
+            return
+        if parsed.path.startswith("/workflows/"):
+            workflow_run_id = unquote(parsed.path.removeprefix("/workflows/"))
+            status, payload = workflow_run_response(PROJECT_ROOT, workflow_run_id)
             self._write_json(status, payload)
             return
 

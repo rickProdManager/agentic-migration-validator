@@ -5,6 +5,8 @@ from tools.artifacts import (
     build_evidence_registry_payload,
     collect_evidence_refs,
     eval_report_evidence_refs,
+    evidence_registry_entries,
+    resolve_evidence_ref,
     validate_artifact,
     validate_artifact_bundle,
 )
@@ -237,6 +239,27 @@ class ArtifactTest(unittest.TestCase):
             entries_by_ref["gate.can_mark_ready.failed_checksum.v1"]["stage"],
             "gatekeeper",
         )
+
+    def test_evidence_registry_entries_indexes_refs(self):
+        payload = build_evidence_registry_payload(build_sample_bundle())
+
+        entries_by_ref = evidence_registry_entries(payload)
+
+        self.assertIn("validation.checksum.public.customers.v1", entries_by_ref)
+        self.assertEqual(
+            entries_by_ref["gate.can_mark_ready.failed_checksum.v1"]["source_artifact_id"],
+            "artifact.eval_report.fixture_suite.v1",
+        )
+
+    def test_resolve_evidence_ref_returns_entry_or_none(self):
+        payload = build_evidence_registry_payload(build_sample_bundle())
+
+        entry = resolve_evidence_ref(payload, "validation.checksum.public.customers.v1")
+        missing = resolve_evidence_ref(payload, "validation.missing.v1")
+
+        self.assertIsNotNone(entry)
+        self.assertEqual(entry["source_type"], "validation_result")
+        self.assertIsNone(missing)
 
     def test_validate_artifact_accepts_evidence_registry_artifact(self):
         bundle = build_sample_bundle()
