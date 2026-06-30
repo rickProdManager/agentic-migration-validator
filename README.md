@@ -4,6 +4,69 @@ Agentic Migration Validator is a local workflow for assessing database migration
 
 The core product idea is simple: advisors propose, deterministic invariants dispose. Model-backed advisors may synthesize plans, explanations, critiques, and runbooks, but database inspection, validation checks, risk scoring, evidence validation, and safety gates are deterministic.
 
+## What It Demonstrates
+
+- PostgreSQL source/target fixture validation with deterministic checksum and schema checks.
+- Structured findings separated across `migration_integrity`, `compatibility_advisory`, and `process_control` risk axes.
+- Gatekeeper decisions that enforce cutover/readiness instead of asking an advisor to decide safety.
+- Evidence-bound runbook drafts whose claims must trace back to deterministic findings and gate results.
+- A local dashboard that launches workflow runs, persists audit-ready state, records approvals, and resolves artifact/evidence details.
+
+## Quickstart
+
+Requirements:
+
+- Python 3.11+
+- Docker with Compose support
+- `make`
+
+Install test dependencies if needed:
+
+```sh
+python3 -m pip install -e ".[dev]"
+```
+
+Run the test suite:
+
+```sh
+make test
+```
+
+Start the fixture databases:
+
+```sh
+make db-up
+```
+
+Start the local API and dashboard:
+
+```sh
+make run-api
+```
+
+Open `http://127.0.0.1:8080/`.
+
+The dashboard is dependency-free and served by the same local API process. Generated `artifacts/` and `runs/` directories are ignored by git because they are reproducible local outputs.
+
+## Dashboard Demo
+
+Use this path when showing the project to a reviewer:
+
+1. In `New Run`, select `Failed Checksum`, then run the workflow.
+2. Confirm the new run is selected in `Runs`.
+3. Inspect `Run Result`, `Workflow Progress`, and `Stage Transitions`.
+4. Open `Readiness Gates` and verify cutover/readiness are blocked by deterministic findings.
+5. Open `Run Artifacts`, choose the runbook draft, and inspect its evidence references.
+6. Submit a validation approval in `Approval Action`.
+7. Confirm `Approval State` and `Audit Trail` update while gate decisions remain derived state.
+
+For the schema-risk contrast, launch or inspect:
+
+- `Schema Drift`: dropped uniqueness remains a low structural note when row data still satisfies uniqueness.
+- `Relaxed Unique Violation`: the same relaxed uniqueness becomes a high blocking finding when row data contains duplicates.
+
+That contrast is the central thesis of the project: metadata identifies where a verdict is needed, row data determines whether migration integrity is actually broken, and gates own the safety decision.
+
 ## Current Status
 
 The deterministic validation spine is implemented. The product requirements and architecture contracts are drafted, risk scoring is available, checksum validation runs against Docker PostgreSQL fixtures, eval matching is calibrated, schema introspection emits structured findings, gatekeeper checks enforce cutover/readiness state, runbook drafts remain evidence-bound, local workflow runs persist API-readable state with audit events and artifact snapshots, approvals persist as auditable run inputs, workflow responses include deterministic stage transition checks, readiness views recompute gates from persisted approvals plus fixture findings, and the local dashboard exposes workflow launch, run history, result/progress summaries, approval submission, runbook, evidence, artifact, and audit drilldowns.
@@ -63,6 +126,7 @@ docs/
   architecture.md
   artifact-schemas.md
   audit-events.md
+  demo-script.md
   evidence-references.md
   fixture-plan.md
   gatekeeper-invariants.md
@@ -142,6 +206,7 @@ pyproject.toml
 | Structured finding schema with `record_type`, `risk_axis`, and `finding_key` | Done |
 | Artifact schemas | Done |
 | Audit event schema | Done |
+| Demo script | Done |
 
 ## Development
 
@@ -322,10 +387,10 @@ That command exits nonzero because the checksum mismatch blocks readiness. The s
 
 ## Next Milestone
 
-The next milestone should move from a working local loop toward better operational clarity:
+The next milestone should improve production-like orchestration depth without weakening the deterministic boundary:
 
-- Add clearer run status/progress states for launched workflows
-- Add a concise workflow result summary after launch
+- Add richer runtime failure recovery and retry handling.
+- Add optional async workflow progress streaming if the stdlib API starts limiting the demo.
 - Consider replacing the stdlib server with a FastAPI backend only if it preserves the same contracts and static UI
 - Keep gate outputs derived from state, never edited directly
 
