@@ -2,6 +2,7 @@ import unittest
 from pathlib import Path
 
 from scripts.serve_api import (
+    LOCAL_ONLY_WARNING,
     MAX_JSON_BODY_BYTES,
     UI_ROOT,
     _content_type,
@@ -30,6 +31,8 @@ class StaticUiTest(unittest.TestCase):
         self.assertIn('id="result-summary-list"', html)
         self.assertIn('id="workflow-step-list"', html)
         self.assertIn('id="transition-list"', html)
+        self.assertIn('id="local-only-warning"', html)
+        self.assertIn("Local demo only", html)
         self.assertIn('id="gate-grid"', html)
         self.assertIn('id="approval-state"', html)
         self.assertIn('id="approval-form"', html)
@@ -80,6 +83,11 @@ class StaticUiTest(unittest.TestCase):
 
     def test_local_api_json_body_limit_is_defined(self):
         self.assertEqual(MAX_JSON_BODY_BYTES, 64 * 1024)
+
+    def test_local_api_startup_warning_is_defined(self):
+        self.assertIn("Local demo only", LOCAL_ONLY_WARNING)
+        self.assertIn("127.0.0.1", LOCAL_ONLY_WARNING)
+        self.assertIn("do not expose", LOCAL_ONLY_WARNING)
 
 
 if __name__ == "__main__":

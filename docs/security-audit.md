@@ -80,6 +80,7 @@ Fixes:
 - Added cross-site POST rejection for browser-originated requests.
 - Added a 64 KiB JSON body limit.
 - Added `X-Content-Type-Options`, `Referrer-Policy`, `Cache-Control`, and a restrictive CSP for HTML.
+- Added a visible local-only warning to the served dashboard and API startup output.
 - Removed raw exception messages from workflow launch failure responses.
 
 Residual risk:

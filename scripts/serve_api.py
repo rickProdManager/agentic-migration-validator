@@ -39,6 +39,7 @@ from tools.api import (
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8080
 MAX_JSON_BODY_BYTES = 64 * 1024
+LOCAL_ONLY_WARNING = "Local demo only. Bind to 127.0.0.1; do not expose this API on a network."
 
 
 class WorkflowApiHandler(BaseHTTPRequestHandler):
@@ -315,6 +316,7 @@ def main(argv: list[str]) -> int:
     port = int(argv[2]) if len(argv) > 2 else DEFAULT_PORT
     server = ThreadingHTTPServer((host, port), WorkflowApiHandler)
     print(f"Serving Agentic Migration Validator API on http://{host}:{port}", flush=True)
+    print(LOCAL_ONLY_WARNING, flush=True)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
