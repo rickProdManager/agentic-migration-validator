@@ -158,6 +158,11 @@ class WorkflowApiHandler(BaseHTTPRequestHandler):
             return
 
         if parsed.path == "/workflows/run":
+            unexpected_body = _unexpected_body_response(self.headers.get("Content-Length"))
+            if unexpected_body is not None:
+                status, payload = unexpected_body
+                self._write_json(status, payload)
+                return
             query = parse_qs(parsed.query)
             scenario_ids = query.get("scenario_id") or default_scenario_ids()
             validation_error = validate_requested_scenarios(PROJECT_ROOT, list(scenario_ids))
@@ -303,6 +308,36 @@ def _is_cross_site_post(origin: str | None, host: str | None, sec_fetch_site: st
 
     parsed_origin = urlparse(origin)
     return parsed_origin.netloc != host or parsed_origin.scheme not in {"http", "https"}
+
+
+def _unexpected_body_response(content_length: str | None) -> tuple[int, dict] | None:
+    try:
+        length = int(content_length or "0")
+    except ValueError:
+        return error_response(
+            "invalid_content_length",
+            "Content-Length must be an integer.",
+            status=400,
+        )
+    if length < 0:
+        return error_response(
+            "invalid_content_length",
+            "Content-Length must not be negative.",
+            status=400,
+        )
+    if length > MAX_JSON_BODY_BYTES:
+        return error_response(
+            "request_body_too_large",
+            "Request body exceeds the local API limit.",
+            status=413,
+        )
+    if length > 0:
+        return error_response(
+            "unexpected_request_body",
+            "This endpoint does not accept a request body; use scenario_id query parameters.",
+            status=400,
+        )
+    return None
 
 
 def _split_nested_workflow_route(path: str, segment: str) -> tuple[str, str]:

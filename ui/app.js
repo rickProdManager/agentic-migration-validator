@@ -13,6 +13,7 @@ const state = {
   selectedEvidence: null,
   selectedAuditEventId: null,
   submittingApproval: false,
+  reviewingApproval: false,
   launchScenarioIds: [],
   runningWorkflow: false,
   launchMessage: "Ready",
@@ -33,6 +34,11 @@ const approvalGateByType = {
   rollback_recommendation: "can_recommend_rollback",
   validation_acceptance: "can_accept_validation",
 };
+
+const evidenceBackedApprovalGates = [
+  "can_recommend_cutover",
+  "can_mark_ready",
+];
 
 const approvalLabels = {
   cutover_recommendation: "Cutover Recommendation",
@@ -106,6 +112,8 @@ const els = {
   metricScenarios: document.querySelector("#metric-scenarios"),
   metricApprovals: document.querySelector("#metric-approvals"),
   metricAudit: document.querySelector("#metric-audit"),
+  operatorGuidanceStatus: document.querySelector("#operator-guidance-status"),
+  operatorGuidance: document.querySelector("#operator-guidance"),
   resultStatus: document.querySelector("#result-status"),
   resultSummaryList: document.querySelector("#result-summary-list"),
   progressCount: document.querySelector("#progress-count"),
@@ -133,8 +141,13 @@ const els = {
   approvalForm: document.querySelector("#approval-form"),
   approvalTypeSelect: document.querySelector("#approval-type-select"),
   approvalEvidenceSelect: document.querySelector("#approval-evidence-select"),
+  approvalImpact: document.querySelector("#approval-impact"),
   approvalActorInput: document.querySelector("#approval-actor-input"),
   approvalNotesInput: document.querySelector("#approval-notes-input"),
+  approvalConfirmationInput: document.querySelector("#approval-confirmation-input"),
+  approvalReview: document.querySelector("#approval-review"),
+  approvalReviewList: document.querySelector("#approval-review-list"),
+  approvalReviewCancelButton: document.querySelector("#approval-review-cancel-button"),
   approvalSubmitButton: document.querySelector("#approval-submit-button"),
   approvalActionStatus: document.querySelector("#approval-action-status"),
 };
@@ -152,6 +165,32 @@ els.runSelect.addEventListener("change", () => {
 els.approvalForm.addEventListener("submit", (event) => {
   event.preventDefault();
   submitApproval();
+});
+
+els.approvalTypeSelect.addEventListener("change", () => {
+  state.reviewingApproval = false;
+  els.approvalConfirmationInput.checked = false;
+  els.approvalEvidenceSelect.value = "";
+  renderApprovalAction();
+});
+
+els.approvalEvidenceSelect.addEventListener("change", () => {
+  state.reviewingApproval = false;
+  els.approvalConfirmationInput.checked = false;
+  renderApprovalImpact();
+  renderApprovalReview();
+  syncApprovalSubmitState();
+});
+
+els.approvalConfirmationInput.addEventListener("change", () => {
+  state.reviewingApproval = false;
+  renderApprovalReview();
+  syncApprovalSubmitState();
+});
+
+els.approvalReviewCancelButton.addEventListener("click", () => {
+  state.reviewingApproval = false;
+  renderApprovalAction();
 });
 
 els.launchForm.addEventListener("submit", (event) => {
@@ -292,6 +331,7 @@ function render() {
 
   renderRuns();
   renderLaunchControls();
+  renderOperatorGuidance(run, selected);
   renderRunResult();
   renderWorkflowProgress();
   renderStageTransitions();
@@ -487,13 +527,103 @@ function renderLaunchControls() {
     : state.launchMessage || `${state.launchScenarioIds.length} selected`;
 }
 
+function renderOperatorGuidance(run, scenario) {
+  if (!run || !scenario) {
+    renderFirstRunGuidance();
+    return;
+  }
+
+  if (run.status === "failed") {
+    renderFailedRunGuidance(run);
+    return;
+  }
+
+  const blockingFindings = blockingFindingsForScenario(scenario);
+  const missingApprovals = missingApprovalsForScenario(scenario);
+  const selectedEvidence = state.selectedEvidenceRef;
+  const readyBlocked = scenario.blocked_gates?.includes("can_mark_ready");
+  const workflowCompleted = run.status === "completed";
+
+  els.operatorGuidanceStatus.textContent = scenario.migration_ready
+    ? "Ready"
+    : `${scenario.blocked_gates?.length || 0} blocked`;
+  els.operatorGuidance.innerHTML = [
+    guidanceStep(
+      "Run validation",
+      workflowCompleted ? "ok" : "warn",
+      workflowCompleted ? "Workflow completed and persisted." : "Wait for the workflow to complete before reviewing readiness.",
+    ),
+    guidanceStep(
+      "Review blockers",
+      blockingFindings.length ? "blocked" : "ok",
+      blockingFindings.length
+        ? `${blockingFindings.length} blocking finding${plural(blockingFindings.length)} must be understood before approvals.`
+        : "No blocking findings on the selected scenario.",
+    ),
+    guidanceStep(
+      "Check evidence",
+      selectedEvidence ? "ok" : "warn",
+      selectedEvidence ? `Selected ${evidenceLabel(selectedEvidence)}.` : "Select a runbook or evidence reference before recording approval.",
+    ),
+    guidanceStep(
+      "Record approvals",
+      missingApprovals.length ? "warn" : "ok",
+      missingApprovals.length
+        ? `${missingApprovals.map(approvalLabel).join(", ")} still required.`
+        : "Required approvals are recorded.",
+    ),
+    guidanceStep(
+      "Re-check readiness",
+      scenario.migration_ready ? "ok" : readyBlocked ? "blocked" : "warn",
+      scenario.migration_ready
+        ? "Ready gate is allowed by deterministic checks."
+        : "Gate outputs stay computed; approvals do not directly set readiness.",
+    ),
+  ].join("");
+}
+
+function renderFirstRunGuidance() {
+  els.operatorGuidanceStatus.textContent = "Start a run";
+  els.operatorGuidance.innerHTML = [
+    guidanceStep("Choose scenarios", "warn", "Select one or more fixture scenarios from New Run."),
+    guidanceStep("Run workflow", "warn", "Create a persisted workflow run before reviewing readiness."),
+    guidanceStep("Review gates", "warn", "Gate results appear after validation completes."),
+    guidanceStep("Check evidence", "warn", "Evidence references appear after artifacts are written."),
+    guidanceStep("Record approvals", "warn", "Approvals stay disabled until a completed run exists."),
+  ].join("");
+}
+
+function renderFailedRunGuidance(run) {
+  const failedStep = failedWorkflowStep(run);
+  const auditEvents = state.audit?.event_count || 0;
+  els.operatorGuidanceStatus.textContent = "Run failed";
+  els.operatorGuidance.innerHTML = [
+    guidanceStep("Stop progression", "blocked", "This run is not eligible for readiness or approval actions."),
+    guidanceStep(
+      "Find failed step",
+      "blocked",
+      failedStep ? `${stepLabel(failedStep.step)} ended as ${titleCase(failedStep.status)}.` : "Review workflow progress for the failed stage.",
+    ),
+    guidanceStep(
+      "Inspect audit",
+      auditEvents ? "warn" : "blocked",
+      auditEvents ? `${auditEvents} audit event${plural(auditEvents)} available for review.` : "No audit trail is available for this failed run.",
+    ),
+    guidanceStep("Fix cause", "warn", "Check fixture databases, artifact validation, and the failure notice before retrying."),
+    guidanceStep("Retry workflow", "warn", "Run the workflow again after the cause is fixed; do not approve this run."),
+  ].join("");
+}
+
 function renderRunResult() {
   const run = state.latest?.workflow_run;
   const manifest = currentArtifactManifest();
   const readinessScenarios = state.readiness?.scenarios || [];
   if (!run) {
     els.resultStatus.textContent = "-";
-    els.resultSummaryList.innerHTML = emptyMarkup("No run selected");
+    els.resultSummaryList.innerHTML = [
+      summaryRow("State", "No run selected"),
+      summaryRow("Next Action", "Select scenarios and run the workflow."),
+    ].join("");
     return;
   }
 
@@ -504,14 +634,20 @@ function renderRunResult() {
     )
     .filter(unique);
   const scenarioText = (run.scenario_ids || []).map(scenarioLabel).join(", ");
+  const failedStep = failedWorkflowStep(run);
   els.resultStatus.textContent = titleCase(run.status);
-  els.resultSummaryList.innerHTML = [
+  const rows = [
     summaryRow("Scenarios", scenarioText || "-"),
     summaryRow("Current Stage", stageLabel(run.current_stage)),
     summaryRow("Blocked Gates", String(blockedGates.length)),
     summaryRow("Blocking Findings", String(blockingFindings.length)),
     summaryRow("Artifact Bundle", manifest?.passed ? `${manifest.artifact_count || 0} accepted` : "not accepted"),
-  ].join("");
+  ];
+  if (run.status === "failed") {
+    rows.push(summaryRow("Failed Step", failedStep ? stepLabel(failedStep.step) : "Unknown"));
+    rows.push(summaryRow("Next Action", "Review the failed step before retrying."));
+  }
+  els.resultSummaryList.innerHTML = rows.join("");
 }
 
 function renderWorkflowProgress() {
@@ -525,7 +661,7 @@ function renderWorkflowProgress() {
   const completed = steps.filter((step) => step.status === "completed").length;
   els.progressCount.textContent = `${completed}/${steps.length} completed`;
   els.workflowStepList.innerHTML = steps
-    .map((step) => progressItem(stepLabel(step.step), step.status, step.model_calls ? `Model Calls: ${titleCase(step.model_calls)}` : ""))
+    .map((step) => progressItem(stepLabel(step.step), step.status, workflowStepDetail(step)))
     .join("");
 }
 
@@ -592,12 +728,13 @@ function renderScenarios() {
     .map((scenario) => {
       const blocked = scenario.blocked_gates.length > 0;
       const selected = scenario.scenario_id === selectedScenario()?.scenario_id;
+      const subtitle = blocked ? scenarioBlockerSummary(scenario) : "Clear";
       return `
         <button class="scenario-button ${selected ? "is-selected" : ""}" type="button" data-scenario-id="${escapeAttr(scenario.scenario_id)}">
           <span class="scenario-dot ${blocked ? "blocked" : "ok"}"></span>
           <span>
             <span class="scenario-name">${escapeHtml(scenarioLabel(scenario.scenario_id))}</span>
-            <span class="scenario-subtitle">${blocked ? `${scenario.blocked_gates.length} blocked` : "Clear"}</span>
+            <span class="scenario-subtitle">${escapeHtml(subtitle)}</span>
           </span>
         </button>
       `;
@@ -628,6 +765,8 @@ function renderGates(scenario) {
     .map(([gate, result]) => {
       const statusClass = result.allowed ? "ok" : "blocked";
       const detail = gateDetail(result);
+      const nextAction = gateNextAction(result);
+      const blockerTags = gateBlockerTags(result);
       return `
         <article class="gate-card ${statusClass}">
           <div class="gate-title">
@@ -635,6 +774,8 @@ function renderGates(scenario) {
             <span class="pill ${statusClass}">${result.allowed ? "Allowed" : "Blocked"}</span>
           </div>
           <div class="gate-detail">${escapeHtml(detail)}</div>
+          ${blockerTags}
+          <div class="gate-next"><strong>Next:</strong> ${escapeHtml(nextAction)}</div>
         </article>
       `;
     })
@@ -648,9 +789,7 @@ function renderFindings(scenario) {
     return;
   }
 
-  const findings = Object.values(scenario.gate_results)
-    .flatMap((gate) => gate.blocking_findings || [])
-    .filter(unique);
+  const findings = blockingFindingsForScenario(scenario);
   els.findingCount.textContent = `${findings.length} blocking`;
   if (!findings.length) {
     els.findingList.innerHTML = emptyMarkup("No blocking findings");
@@ -658,15 +797,19 @@ function renderFindings(scenario) {
   }
 
   els.findingList.innerHTML = findings
-    .map((findingKey) => `
-      <article class="finding">
-        <div class="finding-header">
-          <span class="finding-key">${escapeHtml(findingLabel(findingKey))}</span>
-          <span class="pill blocked">Blocking</span>
-        </div>
-        <div class="finding-meta">Finding key: ${escapeHtml(findingKey)}</div>
-      </article>
-    `)
+    .map((findingKey) => {
+      const impactedGates = impactedGatesForFinding(scenario, findingKey);
+      return `
+        <article class="finding">
+          <div class="finding-header">
+            <span class="finding-key">${escapeHtml(findingLabel(findingKey))}</span>
+            <span class="pill blocked">Blocking</span>
+          </div>
+          <div class="finding-meta">Blocks: ${escapeHtml(impactedGates.map((gate) => gateLabels[gate] || gate).join(", ") || "-")}</div>
+          <div class="finding-meta">Finding key: ${escapeHtml(findingKey)}</div>
+        </article>
+      `;
+    })
     .join("");
 }
 
@@ -688,30 +831,125 @@ function renderApprovals() {
 
 function renderApprovalAction() {
   const pending = state.approvals?.pending_approvals || [];
-  const evidenceRefs = approvalEvidenceRefs();
-  const disabled = !currentRunId() || !pending.length || !evidenceRefs.length || state.submittingApproval;
+  const selectedApprovalType = pending.includes(els.approvalTypeSelect.value)
+    ? els.approvalTypeSelect.value
+    : pending[0] || "";
+  const evidenceRefs = approvalEvidenceRefs(selectedApprovalType);
+  const selectedEvidenceRef = preferredApprovalEvidenceRef(evidenceRefs);
+  const actionUnavailable = approvalActionUnavailable(pending, evidenceRefs);
+  const controlsDisabled = actionUnavailable || state.reviewingApproval;
 
   els.approvalTypeSelect.innerHTML = pending.length
     ? pending
         .map((approval) => `
-          <option value="${escapeAttr(approval)}">${escapeHtml(approvalLabel(approval))}</option>
+          <option value="${escapeAttr(approval)}" ${approval === selectedApprovalType ? "selected" : ""}>${escapeHtml(approvalLabel(approval))}</option>
         `)
         .join("")
     : '<option value="">No pending approvals</option>';
 
   els.approvalEvidenceSelect.innerHTML = evidenceRefs.length
     ? evidenceRefs
-        .map((ref) => `<option value="${escapeAttr(ref)}">${escapeHtml(evidenceLabel(ref))}</option>`)
+        .map((ref) => `<option value="${escapeAttr(ref)}" ${ref === selectedEvidenceRef ? "selected" : ""}>${escapeHtml(evidenceLabel(ref))}</option>`)
         .join("")
     : '<option value="">No evidence available</option>';
 
-  els.approvalTypeSelect.disabled = disabled;
-  els.approvalEvidenceSelect.disabled = disabled;
-  els.approvalActorInput.disabled = disabled;
-  els.approvalNotesInput.disabled = disabled;
-  els.approvalSubmitButton.disabled = disabled;
-  els.approvalSubmitButton.textContent = state.submittingApproval ? "Recording" : "Approve";
+  if (actionUnavailable) {
+    state.reviewingApproval = false;
+    els.approvalConfirmationInput.checked = false;
+  }
+  els.approvalTypeSelect.disabled = controlsDisabled;
+  els.approvalEvidenceSelect.disabled = controlsDisabled;
+  els.approvalActorInput.disabled = controlsDisabled;
+  els.approvalNotesInput.disabled = controlsDisabled;
+  els.approvalConfirmationInput.disabled = controlsDisabled;
   els.approvalActionStatus.textContent = pending.length ? `${pending.length} pending` : "Clear";
+  renderApprovalImpact();
+  renderApprovalReview();
+  syncApprovalSubmitState();
+}
+
+function renderApprovalImpact() {
+  const runId = currentRunId();
+  const selected = selectedScenario();
+  const pending = state.approvals?.pending_approvals || [];
+  const evidenceRefs = approvalEvidenceRefs(els.approvalTypeSelect.value);
+
+  if (!runId || !selected) {
+    els.approvalImpact.className = "approval-impact warn";
+    els.approvalImpact.innerHTML = impactMarkup(
+      "No run selected",
+      "Start or select a workflow run before recording approvals.",
+    );
+    return;
+  }
+
+  if (!selectedRunCompleted()) {
+    els.approvalImpact.className = "approval-impact blocked";
+    els.approvalImpact.innerHTML = impactMarkup(
+      "Completed run required",
+      "Approvals are disabled for failed or incomplete runs. Fix the workflow failure and create a completed run before recording approval.",
+    );
+    return;
+  }
+
+  if (!pending.length) {
+    els.approvalImpact.className = "approval-impact ok";
+    els.approvalImpact.innerHTML = impactMarkup(
+      "No approval pending",
+      "Approval requirements are recorded. Gate outputs remain computed from findings, evidence, and approvals.",
+    );
+    return;
+  }
+
+  if (!evidenceRefs.length) {
+    els.approvalImpact.className = "approval-impact blocked";
+    els.approvalImpact.innerHTML = impactMarkup(
+      "Evidence required",
+      "An approval must cite evidence before it can be recorded.",
+    );
+    return;
+  }
+
+  const approvalType = els.approvalTypeSelect.value;
+  const evidenceRef = els.approvalEvidenceSelect.value;
+  const gate = approvalGateByType[approvalType];
+  const result = selected.gate_results?.[gate];
+  if (!gate || !result) {
+    els.approvalImpact.className = "approval-impact warn";
+    els.approvalImpact.innerHTML = impactMarkup(
+      "Approval impact unavailable",
+      "Select a pending approval to preview the gate it affects.",
+    );
+    return;
+  }
+
+  const remaining = approvalRemainingBlockers(result, approvalType);
+  const title = `${approvalLabel(approvalType)} -> ${gateLabels[gate] || gate}`;
+  const evidence = evidenceRef ? `Evidence: ${evidenceLabel(evidenceRef)}.` : "No evidence selected.";
+
+  if (result.allowed) {
+    els.approvalImpact.className = "approval-impact ok";
+    els.approvalImpact.innerHTML = impactMarkup(
+      title,
+      `${evidence} This gate is already allowed; recording approval will update the audit trail, not readiness directly.`,
+    );
+    return;
+  }
+
+  if (remaining.length) {
+    els.approvalImpact.className = "approval-impact blocked";
+    els.approvalImpact.innerHTML = impactMarkup(
+      title,
+      `${evidence} This approval will be recorded, but the gate will remain blocked by ${remaining.join(", ")}.`,
+    );
+    return;
+  }
+
+  els.approvalImpact.className = "approval-impact ok";
+  els.approvalImpact.innerHTML = impactMarkup(
+    title,
+    `${evidence} This approval is expected to satisfy the selected gate. Other gates may still remain blocked.`,
+  );
 }
 
 async function submitApproval() {
@@ -722,6 +960,19 @@ async function submitApproval() {
   const gate = approvalGateByType[approvalType];
   if (!runId || !selected || !gate || !evidenceRef) {
     setNotice("Approval cannot be submitted without a selected run, gate, scenario, and evidence reference.", false);
+    return;
+  }
+  if (!selectedRunCompleted()) {
+    setNotice("Approval cannot be recorded until the selected workflow run completes.", false);
+    return;
+  }
+  if (!els.approvalConfirmationInput.checked) {
+    setNotice("Confirm evidence review before recording approval.", false);
+    return;
+  }
+  if (!state.reviewingApproval) {
+    state.reviewingApproval = true;
+    renderApprovalAction();
     return;
   }
 
@@ -737,10 +988,13 @@ async function submitApproval() {
       notes: els.approvalNotesInput.value,
     });
     state.submittingApproval = false;
+    state.reviewingApproval = false;
+    els.approvalConfirmationInput.checked = false;
     els.approvalActionStatus.textContent = "recorded";
     await loadDashboard();
   } catch (error) {
     state.submittingApproval = false;
+    state.reviewingApproval = false;
     setNotice(error.message, false);
     render();
   }
@@ -967,6 +1221,19 @@ function summaryRow(label, value) {
   `;
 }
 
+function guidanceStep(title, status, detail) {
+  const statusClass = statusClassFor(status);
+  return `
+    <article class="guidance-step ${statusClass}">
+      <span class="guidance-marker" aria-hidden="true"></span>
+      <span>
+        <span class="guidance-title">${escapeHtml(title)}</span>
+        <span class="guidance-detail">${escapeHtml(detail)}</span>
+      </span>
+    </article>
+  `;
+}
+
 function progressItem(title, status, detail) {
   const statusText = titleCase(status || "-");
   const statusClass = statusClassFor(status);
@@ -981,8 +1248,21 @@ function progressItem(title, status, detail) {
   `;
 }
 
+function workflowStepDetail(step) {
+  if (step.status === "failed") {
+    return "Workflow stopped here. Review this step before retrying.";
+  }
+  if (step.status === "skipped") {
+    return "Skipped after an earlier failure.";
+  }
+  if (step.model_calls) {
+    return `Model Calls: ${titleCase(step.model_calls)}`;
+  }
+  return "";
+}
+
 function statusClassFor(status) {
-  if (status === "completed" || status === "allowed") {
+  if (status === "completed" || status === "allowed" || status === "ok") {
     return "ok";
   }
   if (status === "failed" || status === "blocked") {
@@ -1008,6 +1288,202 @@ function gateDetail(result) {
   return parts.length ? parts.join(" / ") : "All deterministic checks passed.";
 }
 
+function gateNextAction(result) {
+  if (result.allowed) {
+    return "No action needed.";
+  }
+  if (result.blocking_findings?.length) {
+    return `Review ${result.blocking_findings.length} blocking finding${plural(result.blocking_findings.length)} before relying on this gate.`;
+  }
+  if (result.unresolved_evidence_refs?.length) {
+    return `Resolve ${result.unresolved_evidence_refs.length} evidence reference${plural(result.unresolved_evidence_refs.length)} before proceeding.`;
+  }
+  if (result.unmet_prerequisites?.length) {
+    return `Complete ${result.unmet_prerequisites.map(stageLabel).join(", ")} before proceeding.`;
+  }
+  if (result.missing_approvals?.length) {
+    return `Record ${result.missing_approvals.map(approvalLabel).join(", ")} after reviewing supporting evidence.`;
+  }
+  return "Review gate details before proceeding.";
+}
+
+function gateBlockerTags(result) {
+  const tags = [];
+  if (result.blocking_findings?.length) {
+    tags.push(blockerTagMarkup("Finding", result.blocking_findings.length, "blocked"));
+  }
+  if (result.missing_approvals?.length) {
+    tags.push(blockerTagMarkup("Approval", result.missing_approvals.length, "warn"));
+  }
+  if (result.unresolved_evidence_refs?.length) {
+    tags.push(blockerTagMarkup("Evidence", result.unresolved_evidence_refs.length, "blocked"));
+  }
+  if (result.unmet_prerequisites?.length) {
+    tags.push(blockerTagMarkup("Prerequisite", result.unmet_prerequisites.length, "warn"));
+  }
+  return tags.length ? `<div class="blocker-tags">${tags.join("")}</div>` : "";
+}
+
+function blockerTagMarkup(label, count, status) {
+  return `<span class="blocker-tag ${status}">${escapeHtml(`${count} ${label}${plural(count)}`)}</span>`;
+}
+
+function blockingFindingsForScenario(scenario) {
+  return Object.values(scenario?.gate_results || {})
+    .flatMap((gate) => gate.blocking_findings || [])
+    .filter(unique);
+}
+
+function missingApprovalsForScenario(scenario) {
+  return Object.values(scenario?.gate_results || {})
+    .flatMap((gate) => gate.missing_approvals || [])
+    .filter(unique);
+}
+
+function impactedGatesForFinding(scenario, findingKey) {
+  return Object.entries(scenario?.gate_results || {})
+    .filter(([, result]) => (result.blocking_findings || []).includes(findingKey))
+    .map(([gate]) => gate);
+}
+
+function scenarioBlockerSummary(scenario) {
+  const parts = [`${scenario.blocked_gates?.length || 0} blocked`];
+  const findings = blockingFindingsForScenario(scenario);
+  const approvals = missingApprovalsForScenario(scenario);
+  if (findings.length) {
+    parts.push(`${findings.length} finding${plural(findings.length)}`);
+  }
+  if (approvals.length) {
+    parts.push(`${approvals.length} approval${plural(approvals.length)}`);
+  }
+  return parts.join(" / ");
+}
+
+function selectedRunCompleted() {
+  return state.latest?.workflow_run?.status === "completed";
+}
+
+function failedWorkflowStep(run) {
+  return (run?.steps || []).find((step) => ["failed", "skipped"].includes(step.status)) || null;
+}
+
+function syncApprovalSubmitState() {
+  const pending = state.approvals?.pending_approvals || [];
+  const evidenceRefs = approvalEvidenceRefs(els.approvalTypeSelect.value);
+  const actionUnavailable = approvalActionUnavailable(pending, evidenceRefs);
+  const confirmed = els.approvalConfirmationInput.checked;
+  els.approvalSubmitButton.disabled = actionUnavailable || !confirmed;
+  els.approvalSubmitButton.textContent = approvalButtonLabel(actionUnavailable, confirmed, pending, evidenceRefs);
+}
+
+function approvalActionUnavailable(pending, evidenceRefs) {
+  return !currentRunId() || !selectedRunCompleted() || !pending.length || !evidenceRefs.length || state.submittingApproval;
+}
+
+function approvalButtonLabel(actionUnavailable, confirmed, pending, evidenceRefs) {
+  if (state.submittingApproval) {
+    return "Recording";
+  }
+  if (!currentRunId()) {
+    return "Select Run";
+  }
+  if (!selectedRunCompleted()) {
+    return "Completed Run Required";
+  }
+  if (!pending.length) {
+    return "No Approval Needed";
+  }
+  if (!evidenceRefs.length) {
+    return "Evidence Required";
+  }
+  if (actionUnavailable) {
+    return "Approve";
+  }
+  if (!confirmed) {
+    return "Confirm Review";
+  }
+  return state.reviewingApproval ? "Record Approval" : "Review Approval";
+}
+
+function renderApprovalReview() {
+  if (!state.reviewingApproval) {
+    els.approvalReview.hidden = true;
+    els.approvalReviewList.innerHTML = "";
+    return;
+  }
+
+  els.approvalReview.hidden = false;
+  els.approvalReviewList.innerHTML = approvalReviewDetails()
+    .map(([label, value]) => reviewRow(label, value))
+    .join("");
+}
+
+function approvalReviewDetails() {
+  const approvalType = els.approvalTypeSelect.value;
+  const selected = selectedScenario();
+  const gate = approvalGateByType[approvalType];
+  const evidenceRef = els.approvalEvidenceSelect.value;
+  const result = selected?.gate_results?.[gate];
+  return [
+    ["Approval", approvalLabel(approvalType)],
+    ["Scenario", scenarioLabel(selected?.scenario_id)],
+    ["Gate", gateLabels[gate] || gate || "-"],
+    ["Evidence", evidenceLabel(evidenceRef)],
+    ["Impact", approvalImpactSummary(result, approvalType)],
+    ["Boundary", "Does not directly set readiness."],
+  ];
+}
+
+function approvalImpactSummary(result, approvalType) {
+  if (!result) {
+    return "Records audit input; gate impact is unavailable.";
+  }
+  const remaining = approvalRemainingBlockers(result, approvalType);
+  if (result.allowed) {
+    return "Records audit input; selected gate is already allowed.";
+  }
+  if (remaining.length) {
+    return `Records audit input; selected gate remains blocked by ${remaining.join(", ")}.`;
+  }
+  return "Expected to satisfy the selected gate; other gates may still remain blocked.";
+}
+
+function reviewRow(label, value) {
+  return `
+    <div class="review-row">
+      <span class="review-key">${escapeHtml(label)}</span>
+      <span class="review-value">${escapeHtml(value || "-")}</span>
+    </div>
+  `;
+}
+
+function impactMarkup(title, detail) {
+  return `
+    <div class="impact-title">${escapeHtml(title)}</div>
+    <div>${escapeHtml(detail)}</div>
+  `;
+}
+
+function approvalRemainingBlockers(result, approvalType) {
+  const remaining = [];
+  const otherApprovals = (result.missing_approvals || [])
+    .filter((approval) => approval !== approvalType)
+    .map(approvalLabel);
+  if (result.blocking_findings?.length) {
+    remaining.push(`${result.blocking_findings.length} blocking finding${plural(result.blocking_findings.length)}`);
+  }
+  if (result.unresolved_evidence_refs?.length) {
+    remaining.push(`${result.unresolved_evidence_refs.length} unresolved evidence reference${plural(result.unresolved_evidence_refs.length)}`);
+  }
+  if (result.unmet_prerequisites?.length) {
+    remaining.push(`${result.unmet_prerequisites.length} unmet prerequisite${plural(result.unmet_prerequisites.length)}`);
+  }
+  if (otherApprovals.length) {
+    remaining.push(`missing ${otherApprovals.join(", ")}`);
+  }
+  return remaining;
+}
+
 function chipMarkup(label, status) {
   return `<span class="chip ${status}">${escapeHtml(label)}</span>`;
 }
@@ -1025,19 +1501,40 @@ function artifactEvidenceRefs(artifact) {
   return refs.filter(Boolean).filter(unique);
 }
 
-function approvalEvidenceRefs() {
+function approvalEvidenceRefs(approvalType = "") {
   const manifest = currentArtifactManifest();
   const refs = [];
   const artifactIds = (manifest?.artifacts || [])
     .map((artifact) => artifact.artifact_id)
     .filter(Boolean);
+  const selectedArtifactRefs = artifactEvidenceRefs(state.selectedArtifact);
+  const gateRef = approvalGateEvidenceRef(approvalType);
+  if (gateRef) {
+    refs.push(gateRef);
+  }
   refs.push(...artifactIds.filter((artifactId) => artifactId.includes(".eval_report.")));
   if (state.selectedEvidenceRef) {
     refs.push(state.selectedEvidenceRef);
   }
-  refs.push(...artifactEvidenceRefs(state.selectedArtifact));
+  refs.push(...selectedArtifactRefs);
   refs.push(...artifactIds);
   return refs.filter(Boolean).filter(unique);
+}
+
+function approvalGateEvidenceRef(approvalType) {
+  const selected = selectedScenario();
+  const gate = approvalGateByType[approvalType];
+  if (!selected || !gate || !evidenceBackedApprovalGates.includes(gate)) {
+    return null;
+  }
+  return `gate.${gate}.${selected.scenario_id}.v1`;
+}
+
+function preferredApprovalEvidenceRef(evidenceRefs) {
+  if (evidenceRefs.includes(els.approvalEvidenceSelect.value)) {
+    return els.approvalEvidenceSelect.value;
+  }
+  return evidenceRefs[0] || "";
 }
 
 function kvMarkup(rows) {

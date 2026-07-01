@@ -218,6 +218,9 @@ Optional query string:
 scenario_id=failed_checksum&scenario_id=schema_drift
 ```
 
+The endpoint does not accept a request body. Scenario selection is query-only, and
+non-empty bodies are rejected before workflow execution.
+
 Unknown `scenario_id` values are rejected before workflow execution.
 
 Unknown scenario error:

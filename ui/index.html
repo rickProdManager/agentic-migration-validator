@@ -76,6 +76,14 @@
           </article>
         </section>
 
+        <section class="operator-guidance panel" aria-label="Safe workflow path">
+          <div class="panel-heading">
+            <h3>Safe Workflow Path</h3>
+            <span id="operator-guidance-status" class="muted">-</span>
+          </div>
+          <div id="operator-guidance" class="guidance-list"></div>
+        </section>
+
         <section class="summary-grid" aria-label="Workflow summary">
           <section class="panel">
             <div class="panel-heading">
@@ -144,6 +152,7 @@
                   <span>Evidence</span>
                   <select id="approval-evidence-select"></select>
                 </label>
+                <div id="approval-impact" class="approval-impact" aria-live="polite"></div>
                 <label>
                   <span>Actor</span>
                   <input id="approval-actor-input" type="text" value="human.reviewer">
@@ -152,6 +161,15 @@
                   <span>Notes</span>
                   <textarea id="approval-notes-input" rows="3">Reviewed deterministic outputs.</textarea>
                 </label>
+                <label class="approval-confirmation">
+                  <input id="approval-confirmation-input" type="checkbox">
+                  <span>I reviewed the selected evidence and understand this records an audit input, not a direct readiness override.</span>
+                </label>
+                <div id="approval-review" class="approval-review" hidden>
+                  <div class="approval-review-title">Review Approval Before Recording</div>
+                  <div id="approval-review-list" class="approval-review-list"></div>
+                  <button id="approval-review-cancel-button" class="secondary-button" type="button">Cancel Review</button>
+                </div>
                 <button id="approval-submit-button" class="action-button" type="submit">Approve</button>
               </form>
             </section>

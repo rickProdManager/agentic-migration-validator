@@ -376,6 +376,10 @@ textarea {
   margin-top: 16px;
 }
 
+.operator-guidance {
+  margin-bottom: 16px;
+}
+
 .primary-column,
 .secondary-column {
   display: grid;
@@ -484,7 +488,8 @@ textarea {
 .artifact-list,
 .audit-list,
 .summary-list,
-.progress-list {
+.progress-list,
+.guidance-list {
   display: grid;
   gap: 8px;
   padding: 12px;
@@ -554,10 +559,108 @@ button.audit-item {
   overflow-wrap: anywhere;
 }
 
+.blocker-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.blocker-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 3px 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.blocker-tag.blocked {
+  border-color: #efada7;
+  background: var(--block-soft);
+  color: var(--block);
+}
+
+.blocker-tag.warn {
+  border-color: #f3cf75;
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
 .summary-row,
 .progress-item {
   display: grid;
   gap: 7px;
+}
+
+.guidance-list {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.guidance-step {
+  display: grid;
+  grid-template-columns: 11px minmax(0, 1fr);
+  gap: 9px;
+  align-items: start;
+  min-height: 94px;
+  padding: 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.guidance-step.ok {
+  border-color: #9cd8c2;
+}
+
+.guidance-step.warn {
+  border-color: #f3cf75;
+  background: #fffaf0;
+}
+
+.guidance-step.blocked {
+  border-color: #efada7;
+  background: #fff7f6;
+}
+
+.guidance-marker {
+  width: 11px;
+  height: 11px;
+  margin-top: 4px;
+  border-radius: 999px;
+  background: var(--line-strong);
+}
+
+.guidance-step.ok .guidance-marker {
+  background: var(--ok);
+}
+
+.guidance-step.warn .guidance-marker {
+  background: var(--warn);
+}
+
+.guidance-step.blocked .guidance-marker {
+  background: var(--block);
+}
+
+.guidance-title {
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-weight: 800;
+}
+
+.guidance-detail,
+.gate-next,
+.approval-impact {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
 }
 
 .summary-row {
@@ -610,6 +713,76 @@ button.audit-item {
   font-size: 12px;
 }
 
+.approval-form .approval-confirmation {
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  color: var(--text);
+  line-height: 1.4;
+}
+
+.approval-confirmation input {
+  margin-top: 2px;
+  accent-color: var(--ok);
+}
+
+.approval-review {
+  display: grid;
+  gap: 10px;
+  padding: 11px;
+  border: 1px solid #f3cf75;
+  border-radius: 8px;
+  background: var(--warn-soft);
+  color: #684900;
+}
+
+.approval-review[hidden] {
+  display: none;
+}
+
+.approval-review-title {
+  font-weight: 800;
+}
+
+.approval-review-list {
+  display: grid;
+  gap: 7px;
+}
+
+.review-row {
+  display: grid;
+  grid-template-columns: minmax(86px, 0.45fr) minmax(0, 1fr);
+  gap: 8px;
+  align-items: baseline;
+  font-size: 12px;
+}
+
+.review-key {
+  color: #7a5a05;
+  font-weight: 800;
+}
+
+.review-value {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--text);
+  font-weight: 650;
+}
+
+.secondary-button {
+  min-height: 36px;
+  border: 1px solid #caa64f;
+  background: #fff8e6;
+  color: #684900;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.secondary-button:hover:not(:disabled) {
+  background: #ffefbf;
+}
+
 .approval-form input,
 .approval-form select,
 .approval-form textarea {
@@ -624,6 +797,37 @@ button.audit-item {
 
 .approval-form textarea {
   resize: vertical;
+}
+
+.approval-impact {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-soft);
+}
+
+.approval-impact.ok {
+  border-color: #9cd8c2;
+  background: var(--ok-soft);
+  color: #215b48;
+}
+
+.approval-impact.warn {
+  border-color: #f3cf75;
+  background: var(--warn-soft);
+  color: #684900;
+}
+
+.approval-impact.blocked {
+  border-color: #efada7;
+  background: var(--block-soft);
+  color: #7f1d16;
+}
+
+.impact-title {
+  font-weight: 800;
 }
 
 .action-button {
@@ -780,6 +984,10 @@ button.audit-item {
     grid-template-columns: repeat(3, minmax(220px, 1fr));
   }
 
+  .guidance-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .detail-grid {
     grid-template-columns: 1fr;
   }
@@ -799,7 +1007,8 @@ button.audit-item {
   }
 
   .gate-grid,
-  .summary-grid {
+  .summary-grid,
+  .guidance-list {
     grid-template-columns: 1fr;
   }
 
