@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 
 from tools.approvals import build_approval_audit_event, build_approval_record
 from tools.artifacts import resolve_evidence_ref
@@ -72,7 +72,8 @@ def workflow_run_failed_response(error: Exception) -> tuple[int, dict[str, Any]]
         status=500,
     )
     payload["error"]["details"] = {
-        "exception": error.__class__.__name__,
+        "error_code": "workflow_execution_failed",
+        "error_type": error.__class__.__name__,
         "recovery_hint": "Run make db-up, then retry the workflow launch.",
     }
     return status, payload
@@ -358,6 +359,65 @@ def submit_workflow_approval_response(
             "run_state": result,
             "effective_approvals": approval_log.get("effective_approvals", []),
             "pending_approvals": approval_log.get("pending_approvals", []),
+        },
+    )
+
+
+def retry_workflow_run_response(
+    project_root: Path,
+    workflow_run_id: str,
+    run_workflow: Callable[[list[str]], Mapping[str, Any]],
+) -> tuple[int, dict[str, Any]]:
+    source_run = read_workflow_run(project_root, workflow_run_id)
+    if source_run is None:
+        return error_response(
+            "workflow_run_not_found",
+            f"No workflow run found for workflow_run_id {workflow_run_id!r}.",
+            status=404,
+        )
+    if source_run.get("status") != "failed":
+        return error_response(
+            "workflow_retry_not_allowed",
+            "Only failed workflow runs can be retried.",
+            status=409,
+        )
+
+    failure = source_run.get("failure")
+    if isinstance(failure, Mapping) and failure.get("retryable") is False:
+        return error_response(
+            "workflow_retry_not_allowed",
+            "This workflow failure is not marked retryable.",
+            status=409,
+        )
+
+    scenario_ids = [
+        str(scenario_id)
+        for scenario_id in source_run.get("scenario_ids", [])
+        if scenario_id
+    ]
+    if not scenario_ids:
+        return error_response(
+            "workflow_retry_not_allowed",
+            "Failed workflow run does not include scenario_ids to retry.",
+            status=409,
+        )
+
+    retry_run = dict(run_workflow(scenario_ids))
+    retry_run_id = retry_run.get("workflow_run_id")
+    if retry_run_id == workflow_run_id:
+        return error_response(
+            "workflow_retry_failed",
+            "Retry did not create a distinct workflow run.",
+            status=500,
+        )
+
+    return (
+        201,
+        {
+            "retry_of_workflow_run_id": workflow_run_id,
+            "workflow_run_id": retry_run_id,
+            "scenario_ids": scenario_ids,
+            "workflow_run": retry_run,
         },
     )
 

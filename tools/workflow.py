@@ -77,6 +77,57 @@ def build_fixture_workflow_run(
     return workflow_run
 
 
+def build_failed_fixture_workflow_run(
+    *,
+    scenario_ids: list[str],
+    started_at: str,
+    completed_at: str,
+    failed_step: str,
+    error_type: str,
+) -> dict[str, Any]:
+    """Build a persisted workflow response for failures before artifacts exist."""
+
+    error_message = f"Workflow step {failed_step} failed before artifacts could be produced."
+    failure = {
+        "failed_step": failed_step,
+        "error_code": f"workflow_step_failed:{failed_step}",
+        "error_message": error_message,
+        "error_type": error_type,
+        "retryable": True,
+    }
+    workflow_run = {
+        "workflow_run_id": _workflow_run_id(started_at),
+        "workflow_version": WORKFLOW_VERSION,
+        "workspace_id": WORKSPACE_ID,
+        "status": "failed",
+        "current_stage": STEP_TARGET_STAGE.get(failed_step, "evaluation"),
+        "model_calls": "disabled",
+        "scenario_ids": scenario_ids,
+        "started_at": started_at,
+        "completed_at": completed_at,
+        "steps": _failed_steps(failed_step),
+        "artifact_refs": [],
+        "artifact_manifest": {
+            "artifact_count": 0,
+            "artifact_dir": "artifacts",
+            "artifacts": [],
+            "passed": False,
+            "issues": [
+                {
+                    "path": f"workflow.steps.{failed_step}",
+                    "issue": failure["error_code"],
+                }
+            ],
+        },
+        "failure": failure,
+    }
+    workflow_run["stage_transitions"] = [
+        result.to_dict()
+        for result in _fixture_stage_transition_results(workflow_run)
+    ]
+    return workflow_run
+
+
 def validate_workflow_run(workflow_run: Mapping[str, Any]) -> tuple[WorkflowValidationIssue, ...]:
     issues = []
     required_fields = (
@@ -184,6 +235,7 @@ def build_fixture_workflow_audit_log(
             input_summary=f"Executed workflow step {step_name}.",
             output_summary=f"Workflow step {step_name} ended with status {step_status}.",
             metadata={"step": step_name},
+            **_step_error_fields(step_name, step_status, workflow_run),
         )
         events.append(event)
     return events
@@ -230,6 +282,32 @@ def _steps(passed: bool) -> list[dict[str, Any]]:
     ]
 
 
+def _failed_steps(failed_step: str) -> list[dict[str, Any]]:
+    statuses = {}
+    failed_seen = False
+    for step in STEP_NAMES:
+        if step == failed_step:
+            statuses[step] = "failed"
+            failed_seen = True
+        elif failed_seen:
+            statuses[step] = "skipped"
+        else:
+            statuses[step] = "completed"
+
+    if failed_step not in statuses:
+        statuses = {step: "skipped" for step in STEP_NAMES}
+        statuses["run_deterministic_evals"] = "failed"
+
+    return [
+        {
+            "step": step,
+            "status": statuses[step],
+            "model_calls": "disabled",
+        }
+        for step in STEP_NAMES
+    ]
+
+
 def _artifact_refs(artifact_manifest: Mapping[str, Any]) -> list[str]:
     return [
         str(artifact.get("artifact_id"))
@@ -262,6 +340,29 @@ def _audit_status(step_status: str) -> str:
     if step_status == "skipped":
         return "blocked"
     return step_status
+
+
+def _step_error_fields(
+    step_name: str,
+    step_status: str,
+    workflow_run: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    if step_status != "failed":
+        return {}
+    failure = workflow_run.get("failure") if isinstance(workflow_run, Mapping) else None
+    if isinstance(failure, Mapping) and failure.get("failed_step") == step_name:
+        return {
+            "error_code": str(failure["error_code"]),
+            "error_message": str(failure["error_message"]),
+            "error_type": str(failure.get("error_type", "workflow_step_failure")),
+            "retryable": bool(failure.get("retryable", True)),
+        }
+    return {
+        "error_code": f"workflow_step_failed:{step_name}",
+        "error_message": f"Workflow step {step_name} failed.",
+        "error_type": "workflow_step_failure",
+        "retryable": True,
+    }
 
 
 def _workflow_run_id(started_at: str) -> str:

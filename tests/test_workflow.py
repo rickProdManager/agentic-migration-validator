@@ -2,6 +2,7 @@ import unittest
 
 from tools.audit import validate_audit_log
 from tools.workflow import (
+    build_failed_fixture_workflow_run,
     build_fixture_workflow_audit_log,
     build_fixture_workflow_run,
     validate_workflow_run,
@@ -109,6 +110,29 @@ class WorkflowTest(unittest.TestCase):
         self.assertEqual(run["stage_transitions"][-1]["to_stage"], "artifacts_written")
         self.assertEqual(validate_workflow_run(run), ())
 
+    def test_build_failed_fixture_workflow_run_is_auditable(self):
+        run = build_failed_fixture_workflow_run(
+            scenario_ids=["failed_checksum"],
+            started_at="2026-06-29T12:00:00Z",
+            completed_at="2026-06-29T12:01:00Z",
+            failed_step="run_deterministic_evals",
+            error_type="ConnectionError",
+        )
+
+        events = build_fixture_workflow_audit_log(run)
+        failed_event = next(event for event in events if event["status"] == "failed")
+
+        self.assertEqual(run["status"], "failed")
+        self.assertEqual(run["current_stage"], "evaluation")
+        self.assertEqual(run["failure"]["error_type"], "ConnectionError")
+        self.assertNotIn("ConnectionError", run["failure"]["error_message"])
+        self.assertEqual(run["steps"][0]["status"], "failed")
+        self.assertTrue(any(not transition["allowed"] for transition in run["stage_transitions"]))
+        self.assertEqual(failed_event["error_code"], "workflow_step_failed:run_deterministic_evals")
+        self.assertEqual(failed_event["error_type"], "ConnectionError")
+        self.assertEqual(validate_audit_log(events), ())
+        self.assertEqual(validate_workflow_run(run), ())
+
     def test_build_fixture_workflow_audit_log_marks_skipped_write_blocked(self):
         run = build_fixture_workflow_run(
             scenario_ids=["failed_checksum"],
@@ -118,9 +142,21 @@ class WorkflowTest(unittest.TestCase):
         )
 
         events = build_fixture_workflow_audit_log(run)
+        failed_event = next(
+            event
+            for event in events
+            if event.get("metadata", {}).get("step") == "validate_artifact_bundle"
+        )
 
         self.assertEqual(events[-1]["status"], "blocked")
         self.assertEqual(events[-1]["decision"], "stage_completed")
+        self.assertEqual(failed_event["status"], "failed")
+        self.assertEqual(
+            failed_event["error_code"],
+            "workflow_step_failed:validate_artifact_bundle",
+        )
+        self.assertEqual(failed_event["error_type"], "workflow_step_failure")
+        self.assertTrue(failed_event["retryable"])
         self.assertIn("transition_blocked", [event["decision"] for event in events])
         self.assertEqual(validate_audit_log(events), ())
 

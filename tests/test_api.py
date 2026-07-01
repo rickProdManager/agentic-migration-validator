@@ -9,6 +9,7 @@ from tools.api import (
     health_response,
     latest_manifest_response,
     latest_workflow_run_response,
+    retry_workflow_run_response,
     scenarios_response,
     submit_workflow_approval_response,
     validate_requested_scenarios,
@@ -20,6 +21,12 @@ from tools.api import (
     workflow_readiness_response,
     workflow_run_response,
     workflow_runs_response,
+)
+from tools.run_store import write_run_state
+from tools.workflow import (
+    build_failed_fixture_workflow_run,
+    build_fixture_workflow_audit_log,
+    build_fixture_workflow_run,
 )
 
 
@@ -98,7 +105,8 @@ class ApiTest(unittest.TestCase):
         self.assertEqual(status, 500)
         self.assertEqual(response["error"]["code"], "workflow_run_failed")
         self.assertIn("Docker fixture containers", response["error"]["message"])
-        self.assertEqual(response["error"]["details"]["exception"], "ConnectionError")
+        self.assertEqual(response["error"]["details"]["error_code"], "workflow_execution_failed")
+        self.assertEqual(response["error"]["details"]["error_type"], "ConnectionError")
         self.assertNotIn("message", response["error"]["details"])
         self.assertIn("make db-up", response["error"]["details"]["recovery_hint"])
 
@@ -314,6 +322,127 @@ class ApiTest(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(response["workflow_run_id"], workflow_run["workflow_run_id"])
         self.assertEqual(response["event_count"], 1)
+
+    def test_workflow_responses_read_failed_persisted_run(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            workflow_run = build_failed_fixture_workflow_run(
+                scenario_ids=["failed_checksum"],
+                started_at="2026-06-30T12:00:00Z",
+                completed_at="2026-06-30T12:01:00Z",
+                failed_step="run_deterministic_evals",
+                error_type="ConnectionError",
+            )
+            write_run_state(
+                root,
+                workflow_run,
+                build_fixture_workflow_audit_log(workflow_run),
+            )
+
+            run_status, run_response = workflow_run_response(
+                root,
+                workflow_run["workflow_run_id"],
+            )
+            audit_status, audit_response = workflow_audit_response(
+                root,
+                workflow_run["workflow_run_id"],
+            )
+
+        failed_event = next(
+            event for event in audit_response["events"] if event["status"] == "failed"
+        )
+        self.assertEqual(run_status, 200)
+        self.assertEqual(audit_status, 200)
+        self.assertEqual(run_response["workflow_run"]["status"], "failed")
+        self.assertEqual(
+            run_response["workflow_run"]["failure"]["error_code"],
+            "workflow_step_failed:run_deterministic_evals",
+        )
+        self.assertEqual(
+            failed_event["error_code"],
+            "workflow_step_failed:run_deterministic_evals",
+        )
+
+    def test_retry_workflow_run_response_creates_new_run_without_mutating_failed_run(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            failed_run = build_failed_fixture_workflow_run(
+                scenario_ids=["failed_checksum"],
+                started_at="2026-06-30T12:00:00Z",
+                completed_at="2026-06-30T12:01:00Z",
+                failed_step="run_deterministic_evals",
+                error_type="ConnectionError",
+            )
+            write_run_state(
+                root,
+                failed_run,
+                build_fixture_workflow_audit_log(failed_run),
+            )
+            before_audit = workflow_audit_response(root, failed_run["workflow_run_id"])[1]
+
+            def fake_retry_runner(scenario_ids):
+                retried_run = build_fixture_workflow_run(
+                    scenario_ids=scenario_ids,
+                    started_at="2026-06-30T12:02:00Z",
+                    completed_at="2026-06-30T12:03:00Z",
+                    artifact_manifest={
+                        "passed": True,
+                        "artifact_count": 1,
+                        "artifact_dir": "artifacts",
+                        "artifacts": [
+                            {
+                                "artifact_id": "artifact.eval_report.fixture_suite.v1",
+                                "path": "artifacts/eval_report.json",
+                                "content_hash": "sha256:abc",
+                            }
+                        ],
+                    },
+                )
+                write_run_state(
+                    root,
+                    retried_run,
+                    build_fixture_workflow_audit_log(retried_run),
+                )
+                return retried_run
+
+            status, response = retry_workflow_run_response(
+                root,
+                failed_run["workflow_run_id"],
+                fake_retry_runner,
+            )
+            after_audit = workflow_audit_response(root, failed_run["workflow_run_id"])[1]
+            _, runs = workflow_runs_response(root)
+
+        self.assertEqual(status, 201)
+        self.assertEqual(
+            response["retry_of_workflow_run_id"],
+            failed_run["workflow_run_id"],
+        )
+        self.assertEqual(
+            response["workflow_run_id"],
+            "workflow.fixture_validation.20260630_120200",
+        )
+        self.assertEqual(response["scenario_ids"], ["failed_checksum"])
+        self.assertEqual(before_audit, after_audit)
+        self.assertEqual(runs["run_count"], 2)
+        self.assertEqual(
+            runs["latest_workflow_run_id"],
+            "workflow.fixture_validation.20260630_120200",
+        )
+
+    def test_retry_workflow_run_response_rejects_completed_run(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            workflow_run = self.write_run_store(root)
+
+            status, response = retry_workflow_run_response(
+                root,
+                workflow_run["workflow_run_id"],
+                lambda scenario_ids: workflow_run,
+            )
+
+        self.assertEqual(status, 409)
+        self.assertEqual(response["error"]["code"], "workflow_retry_not_allowed")
 
     def test_workflow_approvals_response_reads_approval_log(self):
         with tempfile.TemporaryDirectory() as tmpdir:

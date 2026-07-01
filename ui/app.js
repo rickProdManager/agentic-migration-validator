@@ -16,6 +16,7 @@ const state = {
   reviewingApproval: false,
   launchScenarioIds: [],
   runningWorkflow: false,
+  retryingWorkflow: false,
   launchMessage: "Ready",
 };
 
@@ -198,6 +199,17 @@ els.launchForm.addEventListener("submit", (event) => {
   runWorkflowFromLaunchControls();
 });
 
+els.operatorGuidance.addEventListener("click", (event) => {
+  if (!(event.target instanceof Element)) {
+    return;
+  }
+  const button = event.target.closest("[data-retry-workflow-run-id]");
+  if (!button) {
+    return;
+  }
+  retryFailedWorkflowRun(button.dataset.retryWorkflowRunId);
+});
+
 loadDashboard();
 
 async function loadDashboard() {
@@ -322,12 +334,12 @@ function render() {
   els.runTitle.textContent = run ? shortRunId(run.workflow_run_id) : "Latest Run";
   els.metricWorkflow.textContent = run ? titleCase(run.status) : "-";
   els.metricScenarios.textContent = readiness ? String(readiness.scenario_count) : String(state.scenarios.length || "-");
-  els.metricApprovals.textContent = state.approvals ? String(state.approvals.approval_count) : "-";
+  els.metricApprovals.textContent = selected ? String(missingApprovalsForScenario(selected).length) : "-";
   els.metricAudit.textContent = state.audit ? String(state.audit.event_count) : "-";
   els.selectedScenarioLabel.textContent = selected ? scenarioLabel(selected.scenario_id) : "-";
   els.artifactCount.textContent = manifest ? String(manifest.artifact_count || 0) : "-";
   els.auditCount.textContent = state.audit ? `${state.audit.event_count} events` : "-";
-  els.approvalCount.textContent = state.approvals ? `${state.approvals.approval_count} recorded` : "-";
+  els.approvalCount.textContent = state.approvals ? approvalQueueStatus() : "-";
 
   renderRuns();
   renderLaunchControls();
@@ -543,43 +555,44 @@ function renderOperatorGuidance(run, scenario) {
   const selectedEvidence = state.selectedEvidenceRef;
   const readyBlocked = scenario.blocked_gates?.includes("can_mark_ready");
   const workflowCompleted = run.status === "completed";
+  const validationStep = guidanceStep(
+    "Run validation",
+    workflowCompleted ? "ok" : "warn",
+    workflowCompleted ? "Workflow completed and persisted." : "Wait for the workflow to complete before reviewing readiness.",
+  );
+  const blockerStep = guidanceStep(
+    "Review blockers",
+    blockingFindings.length ? "blocked" : "ok",
+    blockingFindings.length
+      ? `${blockingFindings.length} blocking finding${plural(blockingFindings.length)} must be understood before approvals.`
+      : "No blocking findings on the selected scenario.",
+  );
+  const evidenceStep = guidanceStep(
+    "Check evidence",
+    selectedEvidence ? "ok" : "warn",
+    selectedEvidence ? `Selected ${evidenceLabel(selectedEvidence)}.` : "Select a runbook or evidence reference before recording approval.",
+  );
+  const approvalStep = guidanceStep(
+    "Record approvals",
+    missingApprovals.length ? "warn" : "ok",
+    missingApprovals.length
+      ? approvalRequirementSummary(missingApprovals)
+      : "Required approvals are recorded.",
+  );
+  const readinessStep = guidanceStep(
+    "Re-check readiness",
+    scenario.migration_ready ? "ok" : readyBlocked && blockingFindings.length ? "blocked" : "warn",
+    scenario.migration_ready
+      ? "Ready gate is allowed by deterministic checks."
+      : "Gate outputs stay computed; approvals do not directly set readiness.",
+  );
 
-  els.operatorGuidanceStatus.textContent = scenario.migration_ready
-    ? "Ready"
-    : `${scenario.blocked_gates?.length || 0} blocked`;
-  els.operatorGuidance.innerHTML = [
-    guidanceStep(
-      "Run validation",
-      workflowCompleted ? "ok" : "warn",
-      workflowCompleted ? "Workflow completed and persisted." : "Wait for the workflow to complete before reviewing readiness.",
-    ),
-    guidanceStep(
-      "Review blockers",
-      blockingFindings.length ? "blocked" : "ok",
-      blockingFindings.length
-        ? `${blockingFindings.length} blocking finding${plural(blockingFindings.length)} must be understood before approvals.`
-        : "No blocking findings on the selected scenario.",
-    ),
-    guidanceStep(
-      "Check evidence",
-      selectedEvidence ? "ok" : "warn",
-      selectedEvidence ? `Selected ${evidenceLabel(selectedEvidence)}.` : "Select a runbook or evidence reference before recording approval.",
-    ),
-    guidanceStep(
-      "Record approvals",
-      missingApprovals.length ? "warn" : "ok",
-      missingApprovals.length
-        ? `${missingApprovals.map(approvalLabel).join(", ")} still required.`
-        : "Required approvals are recorded.",
-    ),
-    guidanceStep(
-      "Re-check readiness",
-      scenario.migration_ready ? "ok" : readyBlocked ? "blocked" : "warn",
-      scenario.migration_ready
-        ? "Ready gate is allowed by deterministic checks."
-        : "Gate outputs stay computed; approvals do not directly set readiness.",
-    ),
-  ].join("");
+  els.operatorGuidanceStatus.textContent = scenarioReviewStatus(scenario);
+  els.operatorGuidance.innerHTML = blockingFindings.length
+    ? [blockerStep, evidenceStep, approvalStep, validationStep, readinessStep].join("")
+    : missingApprovals.length
+      ? [approvalStep, evidenceStep, readinessStep, blockerStep, validationStep].join("")
+      : [readinessStep, evidenceStep, blockerStep, validationStep, approvalStep].join("");
 }
 
 function renderFirstRunGuidance() {
@@ -596,6 +609,8 @@ function renderFirstRunGuidance() {
 function renderFailedRunGuidance(run) {
   const failedStep = failedWorkflowStep(run);
   const auditEvents = state.audit?.event_count || 0;
+  const failureSummary = workflowFailureSummary(run, failedStep);
+  const retryable = run.failure?.retryable !== false;
   els.operatorGuidanceStatus.textContent = "Run failed";
   els.operatorGuidance.innerHTML = [
     guidanceStep("Stop progression", "blocked", "This run is not eligible for readiness or approval actions."),
@@ -609,8 +624,17 @@ function renderFailedRunGuidance(run) {
       auditEvents ? "warn" : "blocked",
       auditEvents ? `${auditEvents} audit event${plural(auditEvents)} available for review.` : "No audit trail is available for this failed run.",
     ),
-    guidanceStep("Fix cause", "warn", "Check fixture databases, artifact validation, and the failure notice before retrying."),
-    guidanceStep("Retry workflow", "warn", "Run the workflow again after the cause is fixed; do not approve this run."),
+    guidanceStep("Fix cause", "warn", failureSummary),
+    guidanceStep(
+      "Retry workflow",
+      retryable ? "warn" : "blocked",
+      retryable
+        ? "Create a new run with the same scenarios after the cause is fixed. The failed run stays preserved."
+        : "This failure is not marked retryable.",
+    ),
+    retryable
+      ? `<button class="action-button retry-button" type="button" data-retry-workflow-run-id="${escapeAttr(run.workflow_run_id)}" ${state.retryingWorkflow ? "disabled" : ""}>${state.retryingWorkflow ? "Retrying" : "Retry Workflow"}</button>`
+      : "",
   ].join("");
 }
 
@@ -639,7 +663,7 @@ function renderRunResult() {
   const rows = [
     summaryRow("Scenarios", scenarioText || "-"),
     summaryRow("Current Stage", stageLabel(run.current_stage)),
-    summaryRow("Blocked Gates", String(blockedGates.length)),
+    summaryRow("Gates Needing Action", String(blockedGates.length)),
     summaryRow("Blocking Findings", String(blockingFindings.length)),
     summaryRow("Artifact Bundle", manifest?.passed ? `${manifest.artifact_count || 0} accepted` : "not accepted"),
   ];
@@ -717,6 +741,29 @@ async function runWorkflowFromLaunchControls() {
   }
 }
 
+async function retryFailedWorkflowRun(workflowRunId) {
+  if (!workflowRunId || state.retryingWorkflow) {
+    return;
+  }
+
+  const previousRunId = state.selectedRunId;
+  state.retryingWorkflow = true;
+  setNotice("", true);
+  render();
+  try {
+    const response = await postJson(`/workflows/${encodeURIComponent(workflowRunId)}/retry`);
+    state.selectedRunId = response.workflow_run_id || response.workflow_run?.workflow_run_id || null;
+    resetSelections({keepRun: true});
+    state.retryingWorkflow = false;
+    await loadDashboard();
+  } catch (error) {
+    state.selectedRunId = previousRunId;
+    state.retryingWorkflow = false;
+    setNotice(error.message, false);
+    render();
+  }
+}
+
 function renderScenarios() {
   const readinessScenarios = state.readiness?.scenarios || [];
   if (!readinessScenarios.length) {
@@ -726,12 +773,12 @@ function renderScenarios() {
 
   els.scenarioList.innerHTML = readinessScenarios
     .map((scenario) => {
-      const blocked = scenario.blocked_gates.length > 0;
+      const visualStatus = scenarioVisualStatus(scenario);
       const selected = scenario.scenario_id === selectedScenario()?.scenario_id;
-      const subtitle = blocked ? scenarioBlockerSummary(scenario) : "Clear";
+      const subtitle = scenarioBlockerSummary(scenario);
       return `
         <button class="scenario-button ${selected ? "is-selected" : ""}" type="button" data-scenario-id="${escapeAttr(scenario.scenario_id)}">
-          <span class="scenario-dot ${blocked ? "blocked" : "ok"}"></span>
+          <span class="scenario-dot ${visualStatus}"></span>
           <span>
             <span class="scenario-name">${escapeHtml(scenarioLabel(scenario.scenario_id))}</span>
             <span class="scenario-subtitle">${escapeHtml(subtitle)}</span>
@@ -763,7 +810,8 @@ function renderGates(scenario) {
 
   els.gateGrid.innerHTML = Object.entries(scenario.gate_results)
     .map(([gate, result]) => {
-      const statusClass = result.allowed ? "ok" : "blocked";
+      const displayStatus = gateDisplayStatus(result);
+      const statusClass = displayStatus.statusClass;
       const detail = gateDetail(result);
       const nextAction = gateNextAction(result);
       const blockerTags = gateBlockerTags(result);
@@ -771,7 +819,7 @@ function renderGates(scenario) {
         <article class="gate-card ${statusClass}">
           <div class="gate-title">
             <span>${escapeHtml(gateLabels[gate] || gate)}</span>
-            <span class="pill ${statusClass}">${result.allowed ? "Allowed" : "Blocked"}</span>
+            <span class="pill ${statusClass}">${escapeHtml(displayStatus.label)}</span>
           </div>
           <div class="gate-detail">${escapeHtml(detail)}</div>
           ${blockerTags}
@@ -792,7 +840,7 @@ function renderFindings(scenario) {
   const findings = blockingFindingsForScenario(scenario);
   els.findingCount.textContent = `${findings.length} blocking`;
   if (!findings.length) {
-    els.findingList.innerHTML = emptyMarkup("No blocking findings");
+    els.findingList.innerHTML = emptyMarkup(`No blocking findings for ${scenarioLabel(scenario.scenario_id)}`);
     return;
   }
 
@@ -827,6 +875,21 @@ function renderApprovals() {
     ...pending.map((approval) => chipMarkup(approvalLabel(approval), "warn")),
   ];
   els.approvalState.innerHTML = chips.length ? chips.join("") : emptyMarkup("No approval requirements");
+}
+
+function approvalQueueStatus() {
+  const pending = state.approvals?.pending_approvals?.length || 0;
+  if (pending) {
+    return `${pending} pending`;
+  }
+  return `${state.approvals?.approval_count || 0} recorded`;
+}
+
+function approvalRequirementSummary(approvals) {
+  if (approvals.length <= 2) {
+    return `${approvals.map(approvalLabel).join(", ")} still required.`;
+  }
+  return `${approvals.length} approvals still required. Choose one approval type, confirm its evidence, then record it.`;
 }
 
 function renderApprovalAction() {
@@ -1271,6 +1334,22 @@ function statusClassFor(status) {
   return "warn";
 }
 
+function gateDisplayStatus(result) {
+  if (result.allowed) {
+    return {label: "Allowed", statusClass: "ok"};
+  }
+  if (result.blocking_findings?.length || result.unresolved_evidence_refs?.length) {
+    return {label: "Blocked", statusClass: "blocked"};
+  }
+  if (result.unmet_prerequisites?.length) {
+    return {label: "Waiting", statusClass: "warn"};
+  }
+  if (result.missing_approvals?.length) {
+    return {label: "Needs Approval", statusClass: "warn"};
+  }
+  return {label: "Waiting", statusClass: "warn"};
+}
+
 function gateDetail(result) {
   const parts = [];
   if (result.blocking_findings?.length) {
@@ -1347,16 +1426,46 @@ function impactedGatesForFinding(scenario, findingKey) {
 }
 
 function scenarioBlockerSummary(scenario) {
-  const parts = [`${scenario.blocked_gates?.length || 0} blocked`];
+  const findings = blockingFindingsForScenario(scenario);
+  const approvals = missingApprovalsForScenario(scenario);
+  const unresolvedEvidence = Object.values(scenario?.gate_results || {})
+    .flatMap((gate) => gate.unresolved_evidence_refs || [])
+    .filter(unique);
+  const parts = [];
+  if (findings.length) {
+    parts.push(`${findings.length} blocking finding${plural(findings.length)}`);
+  }
+  if (unresolvedEvidence.length) {
+    parts.push(`${unresolvedEvidence.length} evidence issue${plural(unresolvedEvidence.length)}`);
+  }
+  if (approvals.length) {
+    parts.push(`${approvals.length} approval${plural(approvals.length)} pending`);
+  }
+  return parts.length ? parts.join(" / ") : "Ready";
+}
+
+function scenarioVisualStatus(scenario) {
+  if (scenario.migration_ready) {
+    return "ok";
+  }
+  const hasHardBlocker = blockingFindingsForScenario(scenario).length ||
+    Object.values(scenario?.gate_results || {}).some((gate) => gate.unresolved_evidence_refs?.length);
+  return hasHardBlocker ? "blocked" : "warn";
+}
+
+function scenarioReviewStatus(scenario) {
+  if (scenario.migration_ready) {
+    return "Ready";
+  }
   const findings = blockingFindingsForScenario(scenario);
   const approvals = missingApprovalsForScenario(scenario);
   if (findings.length) {
-    parts.push(`${findings.length} finding${plural(findings.length)}`);
+    return `${findings.length} finding${plural(findings.length)} blocking`;
   }
   if (approvals.length) {
-    parts.push(`${approvals.length} approval${plural(approvals.length)}`);
+    return `${approvals.length} approval${plural(approvals.length)} pending`;
   }
-  return parts.join(" / ");
+  return "Review needed";
 }
 
 function selectedRunCompleted() {
@@ -1365,6 +1474,20 @@ function selectedRunCompleted() {
 
 function failedWorkflowStep(run) {
   return (run?.steps || []).find((step) => ["failed", "skipped"].includes(step.status)) || null;
+}
+
+function workflowFailureSummary(run, failedStep) {
+  const failure = run?.failure || {};
+  if (failure.error_message) {
+    return humanizeEmbeddedIds(failure.error_message);
+  }
+  if (failure.error_code) {
+    return `Failure code: ${humanizeEmbeddedIds(failure.error_code)}.`;
+  }
+  if (failedStep) {
+    return `${stepLabel(failedStep.step)} needs attention before retrying.`;
+  }
+  return "Check fixture databases, artifact validation, and the failure notice before retrying.";
 }
 
 function syncApprovalSubmitState() {

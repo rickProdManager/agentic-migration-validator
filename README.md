@@ -95,7 +95,7 @@ That contrast is the central thesis of the project: metadata identifies where a 
 
 ## Current Status
 
-The deterministic validation spine is implemented. The product requirements and architecture contracts are drafted, risk scoring is available, checksum validation runs against Docker PostgreSQL fixtures, eval matching is calibrated, schema introspection emits structured findings, gatekeeper checks enforce cutover/readiness state, runbook drafts remain evidence-bound, local workflow runs persist API-readable state with audit events and artifact snapshots, approvals persist as auditable run inputs, workflow responses include deterministic stage transition checks, readiness views recompute gates from persisted approvals plus fixture findings, and the local dashboard exposes workflow launch, run history, result/progress summaries, approval submission, runbook, evidence, artifact, and audit drilldowns.
+The deterministic validation spine is implemented. The product requirements and architecture contracts are drafted, risk scoring is available, checksum validation runs against Docker PostgreSQL fixtures, eval matching is calibrated, schema introspection emits structured findings, gatekeeper checks enforce cutover/readiness state, runbook drafts remain evidence-bound, local workflow runs persist API-readable state with audit events and artifact snapshots, early workflow failures persist as auditable failed runs with sanitized error details, approvals persist as auditable run inputs, workflow responses include deterministic stage transition checks, readiness views recompute gates from persisted approvals plus fixture findings, and the local dashboard exposes workflow launch, run history, result/progress summaries, approval submission, runbook, evidence, artifact, and audit drilldowns.
 
 Implemented capabilities:
 
@@ -116,6 +116,7 @@ Implemented capabilities:
 - Local workflow run response in `tools/workflow.py`
 - Audit event validation in `tools/audit.py`
 - Local workflow run, audit-log, and artifact-snapshot persistence in `tools/run_store.py`
+- Structured failed-run records and sanitized runtime error details
 - Human approval records and pending/effective approval state in `tools/approvals.py`
 - Explicit stage transition checks in `tools/transitions.py`
 - Approval-aware readiness views in `tools/readiness.py`
@@ -130,6 +131,7 @@ Not implemented yet:
 
 - Additional data validation detectors beyond checksum
 - Full FastAPI backend
+- Operator-driven retry/resume handling for failed workflow runs
 - Fuller backend workflow orchestration and async progress streaming
 
 ## MVP Scope
@@ -312,7 +314,7 @@ Serve the local JSON API:
 make run-api
 ```
 
-The same server renders the local dashboard at `http://127.0.0.1:8080/`. The dashboard launches fixture workflows, shows workflow result/progress/transition summaries, workflow readiness, approvals, blocking findings, persisted runs, artifact snapshots, evidence references, runbook sections, and selected audit-event details from the JSON routes below. Approval controls submit auditable records through the API; gate outputs remain derived state.
+The same server renders the local dashboard at `http://127.0.0.1:8080/`. The dashboard launches fixture workflows, shows workflow readiness, approvals, blocking findings, and next actions first, then keeps artifact/evidence, audit, and run diagnostics behind optional disclosure sections. Approval controls submit auditable records through the API; failed runs can be retried as new runs; gate outputs remain derived state.
 
 Implemented routes:
 
@@ -332,6 +334,7 @@ Implemented routes:
 - `GET /workflows/{workflow_run_id}/approvals`
 - `GET /workflows/{workflow_run_id}/readiness`
 - `POST /workflows/{workflow_run_id}/approvals`
+- `POST /workflows/{workflow_run_id}/retry`
 - `POST /workflows/run`
 
 Smoke-test the running local API:
@@ -416,11 +419,11 @@ That command exits nonzero because the checksum mismatch blocks readiness. The s
 
 ## Next Milestone
 
-The next milestone should improve production-like orchestration depth without weakening the deterministic boundary:
+The next milestone should continue production-like orchestration depth without weakening the deterministic boundary:
 
-- Add richer runtime failure recovery and retry handling.
+- Add explicit retry or re-run handling for failed persisted runs while preserving the prior audit trail.
+- Add user-visible recovery actions for failed run states only where they reduce operator ambiguity.
 - Add optional async workflow progress streaming if the stdlib API starts limiting the demo.
-- Consider replacing the stdlib server with a FastAPI backend only if it preserves the same contracts and static UI
 - Keep gate outputs derived from state, never edited directly
 
 ## Design Boundary

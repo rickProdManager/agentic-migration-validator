@@ -93,6 +93,8 @@ def build_transition_audit_event(
         stage=result.to_stage,
         decision="transition_allowed" if result.allowed else "transition_blocked",
         status="completed" if result.allowed else "blocked",
+        from_stage=result.from_stage,
+        to_stage=result.to_stage,
         created_at=str(workflow_run.get("completed_at") or workflow_run.get("started_at")),
         input_summary=f"Evaluated transition from {result.from_stage} to {result.to_stage}.",
         output_summary=(

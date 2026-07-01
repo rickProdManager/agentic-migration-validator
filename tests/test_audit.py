@@ -62,6 +62,17 @@ class AuditTest(unittest.TestCase):
 
         self.assertIn("missing_gate", {issue.issue for issue in issues})
 
+    def test_transition_event_requires_stage_links(self):
+        event = audit_event(
+            decision="transition_blocked",
+            status="blocked",
+        )
+
+        issues = validate_audit_event(event)
+
+        self.assertIn("missing_from_stage", {issue.issue for issue in issues})
+        self.assertIn("missing_to_stage", {issue.issue for issue in issues})
+
     def test_approval_event_requires_approval_id(self):
         event = audit_event(
             decision="approval_recorded",
@@ -73,6 +84,7 @@ class AuditTest(unittest.TestCase):
         issues = validate_audit_event(event)
 
         self.assertIn("missing_approval_id", {issue.issue for issue in issues})
+        self.assertIn("missing_gate", {issue.issue for issue in issues})
 
     def test_artifact_event_requires_artifact_link(self):
         event = audit_event(
@@ -94,6 +106,21 @@ class AuditTest(unittest.TestCase):
         issues = validate_audit_event(event)
 
         self.assertIn("missing_evidence_link", {issue.issue for issue in issues})
+
+    def test_failed_event_requires_structured_error_details(self):
+        event = audit_event(status="failed")
+
+        issues = validate_audit_event(event)
+
+        self.assertIn("missing_error_code", {issue.issue for issue in issues})
+        self.assertIn("missing_error_message", {issue.issue for issue in issues})
+
+    def test_retryable_must_be_boolean_when_present(self):
+        event = audit_event(retryable="yes")
+
+        issues = validate_audit_event(event)
+
+        self.assertIn("invalid_boolean", {issue.issue for issue in issues})
 
     def test_link_fields_must_be_string_lists(self):
         event = audit_event(evidence_refs=["valid", 123])

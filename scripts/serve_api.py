@@ -22,6 +22,7 @@ from tools.api import (
     health_response,
     latest_manifest_response,
     latest_workflow_run_response,
+    retry_workflow_run_response,
     scenarios_response,
     submit_workflow_approval_response,
     validate_requested_scenarios,
@@ -176,6 +177,28 @@ class WorkflowApiHandler(BaseHTTPRequestHandler):
                 status, payload = workflow_run_failed_response(error)
                 self._write_json(status, payload)
             return
+        if parsed.path.startswith("/workflows/") and parsed.path.endswith("/retry"):
+            unexpected_body = _unexpected_body_response(
+                self.headers.get("Content-Length"),
+                "This endpoint does not accept a request body; retry uses the failed run's scenario_ids.",
+            )
+            if unexpected_body is not None:
+                status, payload = unexpected_body
+                self._write_json(status, payload)
+                return
+            workflow_run_id = unquote(
+                parsed.path.removeprefix("/workflows/").removesuffix("/retry")
+            )
+            try:
+                status, payload = retry_workflow_run_response(
+                    PROJECT_ROOT,
+                    workflow_run_id,
+                    run_fixture_workflow,
+                )
+            except Exception as error:
+                status, payload = workflow_run_failed_response(error)
+            self._write_json(status, payload)
+            return
         if parsed.path.startswith("/workflows/") and parsed.path.endswith("/approvals"):
             workflow_run_id = unquote(
                 parsed.path.removeprefix("/workflows/").removesuffix("/approvals")
@@ -310,7 +333,10 @@ def _is_cross_site_post(origin: str | None, host: str | None, sec_fetch_site: st
     return parsed_origin.netloc != host or parsed_origin.scheme not in {"http", "https"}
 
 
-def _unexpected_body_response(content_length: str | None) -> tuple[int, dict] | None:
+def _unexpected_body_response(
+    content_length: str | None,
+    message: str = "This endpoint does not accept a request body; use scenario_id query parameters.",
+) -> tuple[int, dict] | None:
     try:
         length = int(content_length or "0")
     except ValueError:
@@ -334,7 +360,7 @@ def _unexpected_body_response(content_length: str | None) -> tuple[int, dict] | 
     if length > 0:
         return error_response(
             "unexpected_request_body",
-            "This endpoint does not accept a request body; use scenario_id query parameters.",
+            message,
             status=400,
         )
     return None

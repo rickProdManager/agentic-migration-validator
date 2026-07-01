@@ -75,6 +75,7 @@ class ApprovalsTest(unittest.TestCase):
 
         self.assertEqual(event["decision"], "approval_recorded")
         self.assertEqual(event["approval_id"], "approval.validation_acceptance.workspace_demo.clean_migration.v1")
+        self.assertEqual(event["gate"], "can_accept_validation")
         self.assertEqual(validate_audit_event(event), ())
 
 

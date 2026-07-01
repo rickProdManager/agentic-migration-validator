@@ -55,6 +55,7 @@ ARTIFACT_DECISIONS = {
     "artifact_accepted",
 }
 GATE_DECISIONS = {"gate_allowed", "gate_blocked"}
+TRANSITION_DECISIONS = {"transition_allowed", "transition_blocked"}
 
 
 @dataclass(frozen=True)
@@ -86,6 +87,12 @@ def build_audit_event(
     output_summary: str | None = None,
     gate: str | None = None,
     approval_id: str | None = None,
+    from_stage: str | None = None,
+    to_stage: str | None = None,
+    error_code: str | None = None,
+    error_message: str | None = None,
+    error_type: str | None = None,
+    retryable: bool | None = None,
     severity: str | None = None,
     confidence_basis: str | None = None,
     metadata: Mapping[str, Any] | None = None,
@@ -112,6 +119,12 @@ def build_audit_event(
         "output_summary": output_summary,
         "gate": gate,
         "approval_id": approval_id,
+        "from_stage": from_stage,
+        "to_stage": to_stage,
+        "error_code": error_code,
+        "error_message": error_message,
+        "error_type": error_type,
+        "retryable": retryable,
         "severity": severity,
         "confidence_basis": confidence_basis,
         "metadata": dict(metadata) if metadata is not None else None,
@@ -161,11 +174,51 @@ def validate_audit_event(
     if decision in GATE_DECISIONS and not event.get("gate"):
         issues.append(AuditValidationIssue("gate", "missing_gate"))
 
-    if decision == "approval_recorded" and not event.get("approval_id"):
-        issues.append(AuditValidationIssue("approval_id", "missing_approval_id"))
+    if decision in TRANSITION_DECISIONS:
+        if not event.get("from_stage"):
+            issues.append(AuditValidationIssue("from_stage", "missing_from_stage"))
+        if not event.get("to_stage"):
+            issues.append(AuditValidationIssue("to_stage", "missing_to_stage"))
+
+    if decision == "approval_recorded":
+        if not event.get("approval_id"):
+            issues.append(AuditValidationIssue("approval_id", "missing_approval_id"))
+        if not event.get("gate"):
+            issues.append(AuditValidationIssue("gate", "missing_gate"))
 
     if event.get("confidence_basis") and not event.get("evidence_refs"):
         issues.append(AuditValidationIssue("confidence_basis", "missing_evidence_link"))
+
+    if event.get("status") == "failed":
+        if not event.get("error_code"):
+            issues.append(AuditValidationIssue("error_code", "missing_error_code"))
+        if not event.get("error_message"):
+            issues.append(AuditValidationIssue("error_message", "missing_error_message"))
+
+    for field in (
+        "audit_event_id",
+        "workflow_run_id",
+        "workspace_id",
+        "scenario_id",
+        "created_at",
+        "actor_name",
+        "actor_type",
+        "stage",
+        "decision",
+        "status",
+        "gate",
+        "approval_id",
+        "from_stage",
+        "to_stage",
+        "error_code",
+        "error_message",
+        "error_type",
+    ):
+        if field in event and (not isinstance(event.get(field), str) or not event.get(field)):
+            issues.append(AuditValidationIssue(field, "invalid_string"))
+
+    if "retryable" in event and not isinstance(event.get("retryable"), bool):
+        issues.append(AuditValidationIssue("retryable", "invalid_boolean"))
 
     return tuple(issues)
 

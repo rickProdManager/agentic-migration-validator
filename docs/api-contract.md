@@ -194,7 +194,7 @@ make run-workflow
 make run-api
 ```
 
-`make run-workflow` emits the workflow run shape above, includes the generated artifact manifest inline, snapshots referenced artifacts under `runs/`, and persists local run state. `make run-api` exposes this through `POST /workflows/run`, retrieval routes for run history, latest run state, workflow-scoped artifact/evidence lookup, audit logs, and a dashboard at `/` with workflow launch controls, result/progress/transition summaries, runbook, artifact, evidence, readiness, approval, and audit drilldowns.
+`make run-workflow` emits the workflow run shape above, includes the generated artifact manifest inline, snapshots referenced artifacts under `runs/`, and persists local run state. `make run-api` exposes this through `POST /workflows/run`, retry support for failed persisted runs, retrieval routes for run history, latest run state, workflow-scoped artifact/evidence lookup, audit logs, and a dashboard at `/` with workflow launch controls, readiness, approval, next-action guidance, and optional artifact/evidence, audit, and run-diagnostic drilldowns.
 
 Response:
 
@@ -242,7 +242,8 @@ Runtime failure error:
     "code": "workflow_run_failed",
     "message": "Workflow run failed. Confirm Docker fixture containers are running and retry.",
     "details": {
-      "exception": "ConnectionError",
+      "error_code": "workflow_execution_failed",
+      "error_type": "ConnectionError",
       "recovery_hint": "Run make db-up, then retry the workflow launch."
     }
   }
@@ -513,6 +514,30 @@ Response:
   ]
 }
 ```
+
+Implemented by `make run-api`.
+
+### `POST /workflows/{workflow_run_id}/retry`
+
+Retries a failed workflow run by creating a new workflow run with the same scenario IDs. The failed run, its audit log, and its persisted state are not overwritten.
+
+The endpoint accepts no request body.
+
+Response:
+
+```json
+{
+  "retry_of_workflow_run_id": "workflow.fixture_validation.20260629_120000",
+  "workflow_run_id": "workflow.fixture_validation.20260629_120500",
+  "scenario_ids": ["failed_checksum"],
+  "workflow_run": {
+    "workflow_run_id": "workflow.fixture_validation.20260629_120500",
+    "status": "completed"
+  }
+}
+```
+
+Completed runs and failures not marked retryable return `workflow_retry_not_allowed`.
 
 Implemented by `make run-api`.
 

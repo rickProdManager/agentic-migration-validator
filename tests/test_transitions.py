@@ -80,6 +80,8 @@ class TransitionsTest(unittest.TestCase):
         event = build_transition_audit_event(result, run)
 
         self.assertEqual(event["decision"], "transition_allowed")
+        self.assertEqual(event["from_stage"], "not_started")
+        self.assertEqual(event["to_stage"], "evaluation")
         self.assertEqual(validate_audit_event(event), ())
 
     def test_blocked_transition_audit_event_is_valid(self):
@@ -90,6 +92,8 @@ class TransitionsTest(unittest.TestCase):
 
         self.assertEqual(event["decision"], "transition_blocked")
         self.assertEqual(event["status"], "blocked")
+        self.assertEqual(event["from_stage"], "evaluation")
+        self.assertEqual(event["to_stage"], "artifacts_written")
         self.assertEqual(validate_audit_event(event), ())
 
 

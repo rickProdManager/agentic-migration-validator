@@ -16,6 +16,7 @@ from scripts.write_artifacts import write_artifact_bundle
 from tools.audit import validate_audit_log
 from tools.run_store import write_run_state
 from tools.workflow import (
+    build_failed_fixture_workflow_run,
     build_fixture_workflow_audit_log,
     build_fixture_workflow_run,
     validate_workflow_run,
@@ -31,7 +32,18 @@ def main(argv: list[str]) -> int:
 
 def run_fixture_workflow(scenario_ids: list[str], *, persist: bool = True) -> dict:
     started_at = _utc_now()
-    artifact_manifest = write_artifact_bundle(scenario_ids)
+    try:
+        artifact_manifest = write_artifact_bundle(scenario_ids)
+    except Exception as error:
+        workflow_run = build_failed_fixture_workflow_run(
+            scenario_ids=scenario_ids,
+            started_at=started_at,
+            completed_at=_utc_now(),
+            failed_step="run_deterministic_evals",
+            error_type=error.__class__.__name__,
+        )
+        return _finalize_workflow_run(workflow_run, persist=persist)
+
     completed_at = _utc_now()
     workflow_run = build_fixture_workflow_run(
         scenario_ids=scenario_ids,
@@ -39,6 +51,10 @@ def run_fixture_workflow(scenario_ids: list[str], *, persist: bool = True) -> di
         started_at=started_at,
         completed_at=completed_at,
     )
+    return _finalize_workflow_run(workflow_run, persist=persist)
+
+
+def _finalize_workflow_run(workflow_run: dict, *, persist: bool) -> dict:
     issues = validate_workflow_run(workflow_run)
     if issues:
         workflow_run["status"] = "failed"

@@ -36,7 +36,7 @@
           </form>
         </div>
         <div class="sidebar-section sidebar-scenarios">
-          <div class="section-label">Run Scenarios</div>
+          <div class="section-label">Review Scenario</div>
           <div id="scenario-list" class="scenario-list"></div>
         </div>
       </aside>
@@ -44,7 +44,7 @@
       <main class="workspace">
         <header class="topbar">
           <div>
-            <div class="eyebrow">Workflow Readiness</div>
+            <div class="eyebrow">Migration Review</div>
             <h2 id="run-title">Latest Run</h2>
           </div>
           <button id="refresh-button" class="icon-button" type="button" aria-label="Refresh data" title="Refresh data">
@@ -59,7 +59,7 @@
 
         <section class="metric-grid" aria-label="Workflow metrics">
           <article class="metric">
-            <span class="metric-label">Workflow</span>
+            <span class="metric-label">Run State</span>
             <strong id="metric-workflow">-</strong>
           </article>
           <article class="metric">
@@ -67,7 +67,7 @@
             <strong id="metric-scenarios">-</strong>
           </article>
           <article class="metric">
-            <span class="metric-label">Approvals</span>
+            <span class="metric-label">Pending Approvals</span>
             <strong id="metric-approvals">-</strong>
           </article>
           <article class="metric">
@@ -76,43 +76,9 @@
           </article>
         </section>
 
-        <section class="operator-guidance panel" aria-label="Safe workflow path">
-          <div class="panel-heading">
-            <h3>Safe Workflow Path</h3>
-            <span id="operator-guidance-status" class="muted">-</span>
-          </div>
-          <div id="operator-guidance" class="guidance-list"></div>
-        </section>
-
-        <section class="summary-grid" aria-label="Workflow summary">
-          <section class="panel">
-            <div class="panel-heading">
-              <h3>Run Result</h3>
-              <span id="result-status" class="muted">-</span>
-            </div>
-            <div id="result-summary-list" class="summary-list"></div>
-          </section>
-
-          <section class="panel">
-            <div class="panel-heading">
-              <h3>Workflow Progress</h3>
-              <span id="progress-count" class="muted">-</span>
-            </div>
-            <div id="workflow-step-list" class="progress-list"></div>
-          </section>
-
-          <section class="panel">
-            <div class="panel-heading">
-              <h3>Stage Transitions</h3>
-              <span id="transition-count" class="muted">-</span>
-            </div>
-            <div id="transition-list" class="progress-list"></div>
-          </section>
-        </section>
-
         <section class="layout-grid">
           <div class="primary-column">
-            <section class="panel">
+            <section class="panel readiness-panel">
               <div class="panel-heading">
                 <h3>Readiness Gates</h3>
                 <span id="selected-scenario-label" class="muted">-</span>
@@ -120,36 +86,135 @@
               <div id="gate-grid" class="gate-grid"></div>
             </section>
 
-            <section class="panel">
+            <section class="panel findings-panel">
               <div class="panel-heading">
-                <h3>Findings</h3>
+                <h3>Blocking Findings</h3>
                 <span id="finding-count" class="muted">-</span>
               </div>
               <div id="finding-list" class="finding-list"></div>
             </section>
+
+            <section class="optional-stack" aria-label="Optional review details">
+              <details class="disclosure-panel">
+                <summary>
+                  <span>Evidence And Artifacts</span>
+                  <span id="artifact-count" class="muted">-</span>
+                </summary>
+                <section class="detail-grid artifact-detail-grid" aria-label="Selected artifact details">
+                  <section class="panel artifact-list-panel">
+                    <div class="panel-heading">
+                      <h3>Run Artifacts</h3>
+                    </div>
+                    <div id="artifact-list" class="artifact-list"></div>
+                  </section>
+
+                  <section class="panel">
+                    <div class="panel-heading">
+                      <h3>Artifact Detail</h3>
+                      <span id="runbook-status" class="muted">-</span>
+                    </div>
+                    <div class="detail-body">
+                      <div id="runbook-title" class="detail-title">-</div>
+                      <div id="runbook-sections" class="section-stack"></div>
+                      <div id="runbook-evidence-list" class="evidence-ref-list"></div>
+                    </div>
+                  </section>
+
+                  <section class="panel">
+                    <div class="panel-heading">
+                      <h3>Evidence Reference</h3>
+                      <span id="evidence-stage" class="muted">-</span>
+                    </div>
+                    <div id="evidence-detail" class="detail-body"></div>
+                  </section>
+                </section>
+              </details>
+
+              <details class="disclosure-panel">
+                <summary>
+                  <span>Audit Trail</span>
+                  <span id="audit-count" class="muted">-</span>
+                </summary>
+                <section class="detail-grid audit-detail-grid" aria-label="Selected audit details">
+                  <section class="panel">
+                    <div class="panel-heading">
+                      <h3>Audit Trail</h3>
+                    </div>
+                    <div id="audit-list" class="audit-list"></div>
+                  </section>
+
+                  <section class="panel">
+                    <div class="panel-heading">
+                      <h3>Audit Event</h3>
+                      <span id="audit-detail-status" class="muted">-</span>
+                    </div>
+                    <div id="audit-detail" class="detail-body"></div>
+                  </section>
+                </section>
+              </details>
+
+              <details class="disclosure-panel">
+                <summary>
+                  <span>Run Diagnostics</span>
+                  <span id="result-status" class="muted">-</span>
+                </summary>
+                <section class="summary-grid" aria-label="Workflow summary">
+                  <section class="panel">
+                    <div class="panel-heading">
+                      <h3>Run Result</h3>
+                    </div>
+                    <div id="result-summary-list" class="summary-list"></div>
+                  </section>
+
+                  <section class="panel">
+                    <div class="panel-heading">
+                      <h3>Workflow Progress</h3>
+                      <span id="progress-count" class="muted">-</span>
+                    </div>
+                    <div id="workflow-step-list" class="progress-list"></div>
+                  </section>
+
+                  <section class="panel">
+                    <div class="panel-heading">
+                      <h3>Stage Transitions</h3>
+                      <span id="transition-count" class="muted">-</span>
+                    </div>
+                    <div id="transition-list" class="progress-list"></div>
+                  </section>
+                </section>
+              </details>
+            </section>
           </div>
 
           <div class="secondary-column">
-            <section class="panel">
+            <section class="operator-guidance panel" aria-label="Recommended review path">
               <div class="panel-heading">
-                <h3>Approval State</h3>
+                <h3>Next Best Action</h3>
+                <span id="operator-guidance-status" class="muted">-</span>
+              </div>
+              <div id="operator-guidance" class="guidance-list"></div>
+            </section>
+
+            <section class="panel approval-queue-panel">
+              <div class="panel-heading">
+                <h3>Approval Queue</h3>
                 <span id="approval-count" class="muted">-</span>
               </div>
               <div id="approval-state" class="chip-list"></div>
             </section>
 
-            <section class="panel">
+            <section class="panel record-approval-panel">
               <div class="panel-heading">
-                <h3>Approval Action</h3>
+                <h3>Record Approval</h3>
                 <span id="approval-action-status" class="muted">-</span>
               </div>
               <form id="approval-form" class="approval-form">
                 <label>
-                  <span>Approval</span>
+                  <span>Approval Type</span>
                   <select id="approval-type-select"></select>
                 </label>
                 <label>
-                  <span>Evidence</span>
+                  <span>Supporting Evidence</span>
                   <select id="approval-evidence-select"></select>
                 </label>
                 <div id="approval-impact" class="approval-impact" aria-live="polite"></div>
@@ -173,54 +238,9 @@
                 <button id="approval-submit-button" class="action-button" type="submit">Approve</button>
               </form>
             </section>
-
-            <section class="panel">
-              <div class="panel-heading">
-                <h3>Run Artifacts</h3>
-                <span id="artifact-count" class="muted">-</span>
-              </div>
-              <div id="artifact-list" class="artifact-list"></div>
-            </section>
-
-            <section class="panel">
-              <div class="panel-heading">
-                <h3>Audit Trail</h3>
-                <span id="audit-count" class="muted">-</span>
-              </div>
-              <div id="audit-list" class="audit-list"></div>
-            </section>
           </div>
         </section>
 
-        <section class="detail-grid" aria-label="Workflow detail">
-          <section class="panel">
-            <div class="panel-heading">
-              <h3>Artifact Detail</h3>
-              <span id="runbook-status" class="muted">-</span>
-            </div>
-            <div class="detail-body">
-              <div id="runbook-title" class="detail-title">-</div>
-              <div id="runbook-sections" class="section-stack"></div>
-              <div id="runbook-evidence-list" class="evidence-ref-list"></div>
-            </div>
-          </section>
-
-          <section class="panel">
-            <div class="panel-heading">
-              <h3>Evidence Reference</h3>
-              <span id="evidence-stage" class="muted">-</span>
-            </div>
-            <div id="evidence-detail" class="detail-body"></div>
-          </section>
-
-          <section class="panel">
-            <div class="panel-heading">
-              <h3>Audit Event</h3>
-              <span id="audit-detail-status" class="muted">-</span>
-            </div>
-            <div id="audit-detail" class="detail-body"></div>
-          </section>
-        </section>
       </main>
     </div>
     <script src="/ui/app.js" defer></script>

@@ -82,6 +82,7 @@ Fixes:
 - Added `X-Content-Type-Options`, `Referrer-Policy`, `Cache-Control`, and a restrictive CSP for HTML.
 - Added a visible local-only warning to the served dashboard and API startup output.
 - Removed raw exception messages from workflow launch failure responses.
+- Persisted early workflow failures as structured failed runs with sanitized failure fields and valid audit logs instead of raw tracebacks.
 
 Residual risk:
 

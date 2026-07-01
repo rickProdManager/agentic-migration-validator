@@ -171,10 +171,10 @@ def build_approval_audit_event(record: Mapping[str, Any]) -> dict[str, Any]:
         decision="approval_recorded",
         status="recorded",
         evidence_refs=record.get("evidence_refs", []),
+        gate=str(record["gate"]),
         approval_id=str(record["approval_id"]),
         created_at=str(record["created_at"]),
         metadata={
-            "gate": record.get("gate"),
             "approval_type": record.get("approval_type"),
             "approval_decision": record.get("decision"),
         },
