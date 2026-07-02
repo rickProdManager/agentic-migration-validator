@@ -16,11 +16,7 @@ After 15 years building enterprise database migration suites, I built this proje
 
 Database migrations fail in the details: a row count matches but a value changed, a constraint was relaxed but the data still behaves correctly, a missing row is either unexplained loss or expected replication lag. Those distinctions require deterministic evidence, explicit policy, and auditable human decisions. Agentic systems can help teams understand and act on that evidence, but the system should still make safety boundaries enforceable in code.
 
-## Why This Exists
-
-A migration validation system should not ask an LLM, "Is this safe to cut over?"
-
-The safer pattern is:
+That is why the workflow uses a safer pattern:
 
 1. Deterministic tools inspect the source and target databases.
 2. The tools emit structured findings with evidence references.
