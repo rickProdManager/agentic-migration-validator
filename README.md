@@ -189,6 +189,8 @@ Run tests:
 make test
 ```
 
+The GitHub Actions workflow runs this dependency-free test suite on Python 3.11 and 3.12. Docker-backed fixture workflow validation remains a local release-readiness check.
+
 Equivalent direct command:
 
 ```sh
