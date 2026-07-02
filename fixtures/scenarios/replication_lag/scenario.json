@@ -1,0 +1,18 @@
+{
+  "scenario_id": "replication_lag",
+  "description": "Target intentionally trails source payments after a known freshness cutoff.",
+  "source_seed": "fixtures/base/source.sql",
+  "target_seed": "fixtures/scenarios/replication_lag/target.sql",
+  "critical_tables": ["customers", "orders", "payments"],
+  "business_keys": {
+    "customers": ["email"],
+    "orders": ["order_number"],
+    "payments": ["payment_reference"]
+  },
+  "allowed_lag": {
+    "table": "payments",
+    "freshness_column": "paid_at",
+    "source_cutoff": "2026-02-02T00:00:00Z"
+  },
+  "expected_results": "fixtures/scenarios/replication_lag/expected_findings.json"
+}

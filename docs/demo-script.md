@@ -44,10 +44,13 @@ The important point: approval submission changes persisted inputs and audit stat
 
 ## Scenario Contrast
 
-Use these two scenarios to explain why this is more than a checksum demo:
+Use these scenarios to explain why this is more than a checksum demo:
 
 | Scenario | What To Show | Meaning |
 | --- | --- | --- |
+| `Broken Foreign Key` | Target drops a foreign key and has an order pointing at a missing customer. | Referential drift becomes blocking when row data contains orphaned references. |
+| `Missing Rows` | Target is missing a source payment row with no lag policy. | Unexplained row loss blocks cutover/readiness. |
+| `Replication Lag` | The same target gap is explained by a source freshness cutoff. | Known lag is surfaced without pretending data was lost. |
 | `Schema Drift` | Dropped uniqueness exists, but row data still has unique payment references. | Structural drift is noted, but migration integrity is not blocked. |
 | `Relaxed Unique Violation` | The same dropped uniqueness exists, and row data now has duplicate payment references. | The triggered data check escalates the issue into a blocking migration-integrity finding. |
 
@@ -66,8 +69,11 @@ make eval-scenarios
 
 Then compare:
 
+- `broken_fk`: dropped foreign key plus orphaned row, gates blocked.
 - `clean_migration`: no findings, gates allowed.
 - `failed_checksum`: checksum finding, gates blocked.
+- `missing_rows`: missing-row finding, gates blocked.
+- `replication_lag`: lag finding, gates allowed.
 - `schema_drift`: schema findings, triggered data checks pass, gates allowed.
 - `schema_relaxed_unique_violation`: schema relaxation plus duplicate data, gates blocked.
 

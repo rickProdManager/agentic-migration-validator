@@ -84,10 +84,22 @@ fixtures/
     source.sql
     target.sql
   scenarios/
+    broken_fk/
+      target.sql
+      scenario.json
+      expected_findings.json
     clean_migration/
       scenario.json
       expected_findings.json
     failed_checksum/
+      target.sql
+      scenario.json
+      expected_findings.json
+    missing_rows/
+      target.sql
+      scenario.json
+      expected_findings.json
+    replication_lag/
       target.sql
       scenario.json
       expected_findings.json
@@ -101,7 +113,7 @@ fixtures/
       expected_findings.json
 ```
 
-`clean_migration`, `failed_checksum`, `schema_drift`, and `schema_relaxed_unique_violation` are the first implemented scenarios. `schema_drift` proves relaxed schema guarantees stay low when row data remains clean. `schema_relaxed_unique_violation` proves a relaxed unique constraint escalates to a blocking validation finding when duplicate data exists.
+The implemented scenarios cover baseline success, checksum drift, missing rows, explained replication lag, schema drift, referential integrity failure, and schema-triggered data escalation. `missing_rows` and `replication_lag` use the same missing target payment row to prove that unexplained loss blocks readiness while known lag remains non-blocking. `schema_drift` proves relaxed schema guarantees stay low when row data remains clean. `schema_relaxed_unique_violation` proves a relaxed unique constraint escalates to a blocking validation finding when duplicate data exists. `broken_fk` proves a dropped foreign key becomes a blocking validation finding when target rows contain orphaned references.
 
 ## Local Commands
 

@@ -60,6 +60,92 @@ class FixtureManifestTest(unittest.TestCase):
         self.assertIn("UPDATE customers", target_sql)
         self.assertIn("full_name = 'Ada L.'", target_sql)
 
+    def test_missing_rows_declares_blocking_row_presence_finding(self):
+        expected = self.load_json(
+            SCENARIOS_ROOT / "missing_rows" / "expected_findings.json"
+        )
+        finding = expected["expected_findings"][0]
+
+        self.assertEqual(expected["scenario_id"], "missing_rows")
+        self.assertEqual(
+            finding["finding_key"],
+            "validation.missing_rows:public.payments:*",
+        )
+        self.assertEqual(finding["detector"], "row_presence")
+        self.assertEqual(finding["expected_gate_effect"], ["blocks_cutover", "blocks_ready"])
+
+    def test_replication_lag_declares_non_blocking_lag_finding(self):
+        scenario = self.load_json(SCENARIOS_ROOT / "replication_lag" / "scenario.json")
+        expected = self.load_json(
+            SCENARIOS_ROOT / "replication_lag" / "expected_findings.json"
+        )
+        finding = expected["expected_findings"][0]
+
+        self.assertEqual(expected["scenario_id"], "replication_lag")
+        self.assertEqual(scenario["allowed_lag"]["table"], "payments")
+        self.assertEqual(scenario["allowed_lag"]["freshness_column"], "paid_at")
+        self.assertEqual(
+            finding["finding_key"],
+            "validation.replication_lag:public.payments:*",
+        )
+        self.assertEqual(finding["detector"], "lag_aware_row_freshness")
+        self.assertEqual(finding["expected_gate_effect"], [])
+
+    def test_missing_rows_and_replication_lag_share_same_row_delta(self):
+        missing_sql = (SCENARIOS_ROOT / "missing_rows" / "target.sql").read_text()
+        lag_sql = (SCENARIOS_ROOT / "replication_lag" / "target.sql").read_text()
+
+        self.assertEqual(missing_sql, lag_sql)
+        self.assertIn("DELETE FROM payments", missing_sql)
+        self.assertIn("payment_id = 5001", missing_sql)
+
+    def test_broken_fk_declares_referential_findings(self):
+        expected = self.load_json(
+            SCENARIOS_ROOT / "broken_fk" / "expected_findings.json"
+        )
+        finding_keys = {finding["finding_key"] for finding in expected["expected_findings"]}
+        data_checks = {
+            (
+                check["check_type"],
+                check["schema"],
+                check["table"],
+                check.get("constraint"),
+                check.get("orphan_count"),
+            )
+            for check in expected["expected_data_checks"]
+        }
+
+        self.assertEqual(expected["scenario_id"], "broken_fk")
+        self.assertEqual(
+            finding_keys,
+            {
+                "validation.checksum_mismatch:public.orders:*",
+                "schema.foreign_key_relaxed:public.orders:orders_customer_id_fkey",
+                "validation.broken_referential_integrity:public.orders:orders_customer_id_fkey",
+            },
+        )
+        self.assertEqual(
+            data_checks,
+            {
+                (
+                    "orphans_after_foreign_key_relaxation",
+                    "public",
+                    "orders",
+                    "orders_customer_id_fkey",
+                    1,
+                ),
+            },
+        )
+
+    def test_broken_fk_target_drops_fk_and_orphans_order(self):
+        target_sql = (SCENARIOS_ROOT / "broken_fk" / "target.sql").read_text()
+
+        self.assertIn("/fixtures/base/common.sql", target_sql)
+        self.assertIn("DROP CONSTRAINT orders_customer_id_fkey", target_sql)
+        self.assertIn("UPDATE orders", target_sql)
+        self.assertIn("customer_id = 999", target_sql)
+        self.assertIn("order_id = 102", target_sql)
+
     def test_schema_drift_declares_raw_expected_deltas(self):
         expected = self.load_json(
             SCENARIOS_ROOT / "schema_drift" / "expected_findings.json"

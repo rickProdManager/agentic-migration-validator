@@ -125,6 +125,41 @@ class SchemaPolicyTest(unittest.TestCase):
         self.assertEqual(check.columns, ("payment_reference",))
         self.assertIn(check.evidence_ref, finding["evidence_refs"])
 
+    def test_missing_foreign_key_emits_structural_finding_and_orphan_check(self):
+        result = map_schema_deltas(
+            [
+                delta(
+                    "missing_foreign_key_constraint",
+                    table="orders",
+                    constraint="orders_customer_id_fkey",
+                    source={
+                        "name": "orders_customer_id_fkey",
+                        "constraint_type": "foreign_key",
+                        "columns": ["customer_id"],
+                        "referenced_schema": "public",
+                        "referenced_table": "customers",
+                        "referenced_columns": ["customer_id"],
+                    },
+                )
+            ],
+            critical_tables=["orders"],
+        )
+
+        finding = result.findings[0]
+        check = result.follow_up_checks[0]
+
+        self.assertEqual(
+            finding["finding_key"],
+            "schema.foreign_key_relaxed:public.orders:orders_customer_id_fkey",
+        )
+        self.assertEqual(finding["severity"], "low")
+        self.assertEqual(finding["gate_effect"], [])
+        self.assertEqual(check.check_type, "orphans_after_foreign_key_relaxation")
+        self.assertEqual(check.columns, ("customer_id",))
+        self.assertEqual(check.referenced_table, "customers")
+        self.assertEqual(check.referenced_columns, ("customer_id",))
+        self.assertIn(check.evidence_ref, finding["evidence_refs"])
+
     def test_extra_target_column_routes_to_low_advisory(self):
         result = map_schema_deltas(
             [

@@ -1,0 +1,14 @@
+{
+  "scenario_id": "broken_fk",
+  "description": "Target drops a foreign key guarantee and contains an orphaned order row.",
+  "source_seed": "fixtures/base/source.sql",
+  "target_seed": "fixtures/scenarios/broken_fk/target.sql",
+  "critical_tables": ["customers", "orders", "payments"],
+  "business_keys": {
+    "customers": ["email"],
+    "orders": ["order_number"],
+    "payments": ["payment_reference"]
+  },
+  "allowed_lag": null,
+  "expected_results": "fixtures/scenarios/broken_fk/expected_findings.json"
+}

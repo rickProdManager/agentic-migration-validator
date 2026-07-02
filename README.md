@@ -27,8 +27,11 @@ This project models the control layer around a database migration, not a one-cli
 
 Concrete examples are included as local fixture scenarios:
 
+- `Broken Foreign Key`: a target drops a foreign key and now contains an orphaned order row.
 - `Clean Migration`: baseline source/target agreement.
 - `Failed Checksum`: row counts and schema match, but customer data changed.
+- `Missing Rows`: target is missing a source row with no lag policy explaining the gap.
+- `Replication Lag`: the same missing target row is explained by a known freshness cutoff and stays non-blocking.
 - `Schema Drift`: a target schema guarantee is relaxed, but row data still satisfies the original guarantee.
 - `Relaxed Unique Violation`: the same relaxed schema guarantee now contains duplicate target data, so the issue becomes blocking.
 
@@ -95,17 +98,18 @@ That contrast is the central thesis of the project: metadata identifies where a 
 
 ## Current Status
 
-The deterministic validation spine is implemented. The product requirements and architecture contracts are drafted, risk scoring is available, checksum validation runs against Docker PostgreSQL fixtures, eval matching is calibrated, schema introspection emits structured findings, gatekeeper checks enforce cutover/readiness state, runbook drafts remain evidence-bound, local workflow runs persist API-readable state with audit events and artifact snapshots, early workflow failures persist as auditable failed runs with sanitized error details, approvals persist as auditable run inputs, workflow responses include deterministic stage transition checks, readiness views recompute gates from persisted approvals plus fixture findings, and the local dashboard exposes workflow launch, run history, result/progress summaries, approval submission, runbook, evidence, artifact, and audit drilldowns.
+The deterministic validation spine is implemented. The product requirements and architecture contracts are drafted, risk scoring is available, checksum and row-presence validation run against Docker PostgreSQL fixtures, eval matching is calibrated, schema introspection emits structured findings, gatekeeper checks enforce cutover/readiness state, runbook drafts remain evidence-bound, local workflow runs persist API-readable state with audit events and artifact snapshots, early workflow failures persist as auditable failed runs with sanitized error details, approvals persist as auditable run inputs, workflow responses include deterministic stage transition checks, readiness views recompute gates from persisted approvals plus fixture findings, and the local dashboard exposes workflow launch, run history, result/progress summaries, approval submission, runbook, evidence, artifact, and audit drilldowns.
 
 Implemented capabilities:
 
 - Axis-aware risk scoring in `tools/risk_scoring.py`
 - Canonical row and table checksums in `tools/checksum.py`
 - Checksum validation findings in `tools/checksum_validation.py`
+- Row-presence and lag-aware freshness findings in `tools/row_validation.py`
+- Schema-triggered data checks for relaxed nullability, dropped unique constraints, and dropped foreign keys
 - Detection eval matching in `tools/eval_runner.py`
 - Raw schema introspection and diffing in `tools/schema_introspection.py` and `tools/schema_diff.py`
 - Axis-first schema delta policy mapping in `tools/schema_policy.py`
-- Schema-triggered data checks for relaxed nullability and dropped unique constraints
 - Deterministic cutover/readiness gate checks in `tools/gatekeeper.py`
 - Evidence-bound runbook draft generation in `tools/runbook_advisor.py`
 - Optional live model prose for runbook drafts in `tools/live_model.py`
@@ -125,14 +129,13 @@ Implemented capabilities:
 - Unit tests in `tests/`
 - Foundation specs for architecture, findings, evidence references, gatekeeper invariants, fixtures, artifacts, audit events, and the initial API
 - Docker Compose fixture databases for `source-postgres` and `target-postgres`
-- Seed fixtures for `clean_migration`, `failed_checksum`, `schema_drift`, and `schema_relaxed_unique_violation`
+- Seed fixtures for `broken_fk`, `clean_migration`, `failed_checksum`, `missing_rows`, `replication_lag`, `schema_drift`, and `schema_relaxed_unique_violation`
 
 Not implemented yet:
 
-- Additional data validation detectors beyond checksum
 - Full FastAPI backend
-- Operator-driven retry/resume handling for failed workflow runs
 - Fuller backend workflow orchestration and async progress streaming
+- Additional bounded detector scenarios beyond the current demo-critical checksum, row-presence, lag-aware freshness, referential, schema-diff, and schema-triggered data checks
 
 ## MVP Scope
 
@@ -177,6 +180,7 @@ tests/
   test_gatekeeper.py
   test_risk_scoring.py
   test_readiness.py
+  test_row_validation.py
   test_runbook_advisor.py
   test_run_store.py
   test_schema_diff.py
@@ -196,6 +200,7 @@ tools/
   gatekeeper.py
   risk_scoring.py
   readiness.py
+  row_validation.py
   runbook_advisor.py
   run_store.py
   schema_diff.py
@@ -389,23 +394,26 @@ make eval-scenarios
 
 The command resets Docker-managed source and target PostgreSQL databases for each scenario, runs checksum validation, runs schema introspection and schema-triggered data checks, compares produced findings to expected findings, and evaluates cutover/readiness gates. Model calls are disabled.
 
-The four implemented scenarios show the core migration use cases:
+The implemented scenarios show the core migration use cases:
 
 | Scenario | Migration Situation | What It Proves | Cutover/Ready |
 | --- | --- | --- | --- |
+| `broken_fk` | A target drops a foreign key and now has an order pointing at a missing customer. | Catalog drift triggers a row-data check, and orphaned references become a blocking integrity finding. | Blocked |
 | `clean_migration` | A rehearsal where the migrated target matches the source. | Source and target data/schema match. No detector findings are emitted. | Allowed |
 | `failed_checksum` | A migration where counts and schema look fine, but migrated row content changed. | Data content drift is caught by canonical checksums even when row counts match. | Blocked |
+| `missing_rows` | A target is missing a source payment row with no lag policy explaining the gap. | Unexplained missing source rows are treated as migration-integrity failures. | Blocked |
+| `replication_lag` | The same target row gap is covered by a known source freshness cutoff. | Explained lag is surfaced as a non-blocking freshness finding instead of missing-row loss. | Allowed |
 | `schema_drift` | A target schema differs from the source, but the rows still satisfy the original guarantee. | Schema differences can be structural or advisory without corrupting migrated data. Relaxed guarantees trigger row-data checks, and clean row data stays non-blocking. | Allowed |
 | `schema_relaxed_unique_violation` | The target drops a uniqueness guarantee and migrated rows now contain duplicates. | The same relaxed unique constraint becomes a blocking integrity finding when target row data contains duplicates. | Blocked |
 
 Read each scenario result through three fields:
 
-- `validation_findings`: row/data validation findings, such as canonical checksum mismatches.
+- `validation_findings`: row/data validation findings, such as canonical checksum mismatches, missing rows, or explained replication lag.
 - `schema_findings`: catalog-level findings, such as widened types, relaxed constraints, or extra target columns.
-- `schema_data_check_results`: row-data checks triggered by schema relaxation, such as duplicate checks after a unique constraint is dropped.
+- `schema_data_check_results`: row-data checks triggered by schema relaxation, such as duplicate checks after a unique constraint is dropped or orphan checks after a foreign key is dropped.
 - `gate_results`: deterministic `can_recommend_cutover` and `can_mark_ready` decisions, including the specific blocking finding keys.
 
-The important distinction is visible in the two schema scenarios. `schema_drift` drops a unique constraint but keeps payment references unique, so it emits a low structural finding and the duplicate check passes. `schema_relaxed_unique_violation` drops the same constraint and introduces duplicate payment references, so the triggered data check emits a high blocking validation finding.
+Three contrasts carry the main thesis. `missing_rows` and `replication_lag` share the same missing target payment row, but the lag scenario includes a known freshness cutoff, so it emits a non-blocking `validation.replication_lag` finding instead of a blocking `validation.missing_rows` finding. `schema_drift` drops a unique constraint but keeps payment references unique, so it emits a low structural finding and the duplicate check passes. `schema_relaxed_unique_violation` drops the same constraint and introduces duplicate payment references, so the triggered data check emits a high blocking validation finding. `broken_fk` applies the same schema-then-data pattern to referential integrity: a dropped foreign key becomes blocking only when target rows actually contain orphaned references.
 
 That is the central design boundary: detectors and data checks produce structured facts; the gatekeeper decides whether those facts block cutover/readiness; future advisors may explain or summarize, but they do not decide safety.
 
@@ -417,12 +425,11 @@ make enforce-gate SCENARIO=failed_checksum GATE=can_mark_ready
 
 That command exits nonzero because the checksum mismatch blocks readiness. The same command with `SCENARIO=clean_migration` exits successfully.
 
-## Next Milestone
+## Potential Extensions
 
-The next milestone should continue production-like orchestration depth without weakening the deterministic boundary:
+Future work should continue production-like orchestration depth without weakening the deterministic boundary:
 
-- Add explicit retry or re-run handling for failed persisted runs while preserving the prior audit trail.
-- Add user-visible recovery actions for failed run states only where they reduce operator ambiguity.
+- Add bounded detector scenarios only when they prove a demo-critical distinction the current scenarios do not already show.
 - Add optional async workflow progress streaming if the stdlib API starts limiting the demo.
 - Keep gate outputs derived from state, never edited directly
 

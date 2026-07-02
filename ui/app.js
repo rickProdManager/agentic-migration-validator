@@ -50,8 +50,11 @@ const approvalLabels = {
 };
 
 const scenarioLabels = {
+  broken_fk: "Broken Foreign Key",
   clean_migration: "Clean Migration",
   failed_checksum: "Failed Checksum",
+  missing_rows: "Missing Rows",
+  replication_lag: "Replication Lag",
   schema_drift: "Schema Drift",
   schema_relaxed_unique_violation: "Relaxed Unique Violation",
 };

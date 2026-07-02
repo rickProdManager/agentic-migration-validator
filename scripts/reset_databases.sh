@@ -9,8 +9,17 @@ case "$SCENARIO" in
   clean_migration)
     TARGET_SEED="/fixtures/base/target.sql"
     ;;
+  broken_fk)
+    TARGET_SEED="/fixtures/scenarios/broken_fk/target.sql"
+    ;;
   failed_checksum)
     TARGET_SEED="/fixtures/scenarios/failed_checksum/target.sql"
+    ;;
+  missing_rows)
+    TARGET_SEED="/fixtures/scenarios/missing_rows/target.sql"
+    ;;
+  replication_lag)
+    TARGET_SEED="/fixtures/scenarios/replication_lag/target.sql"
     ;;
   schema_drift)
     TARGET_SEED="/fixtures/scenarios/schema_drift/target.sql"
@@ -20,7 +29,7 @@ case "$SCENARIO" in
     ;;
   *)
     echo "Unknown scenario: $SCENARIO" >&2
-    echo "Known scenarios: clean_migration, failed_checksum, schema_drift, schema_relaxed_unique_violation" >&2
+    echo "Known scenarios: broken_fk, clean_migration, failed_checksum, missing_rows, replication_lag, schema_drift, schema_relaxed_unique_violation" >&2
     exit 2
     ;;
 esac

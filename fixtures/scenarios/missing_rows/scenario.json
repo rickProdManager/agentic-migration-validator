@@ -1,0 +1,14 @@
+{
+  "scenario_id": "missing_rows",
+  "description": "Target is missing a source payment row with no lag policy explaining the gap.",
+  "source_seed": "fixtures/base/source.sql",
+  "target_seed": "fixtures/scenarios/missing_rows/target.sql",
+  "critical_tables": ["customers", "orders", "payments"],
+  "business_keys": {
+    "customers": ["email"],
+    "orders": ["order_number"],
+    "payments": ["payment_reference"]
+  },
+  "allowed_lag": null,
+  "expected_results": "fixtures/scenarios/missing_rows/expected_findings.json"
+}

@@ -16,6 +16,9 @@ class SchemaDataCheck:
     column: str | None = None
     constraint: str | None = None
     columns: tuple[str, ...] = ()
+    referenced_schema: str | None = None
+    referenced_table: str | None = None
+    referenced_columns: tuple[str, ...] = ()
 
     @property
     def evidence_ref(self) -> str:
@@ -30,6 +33,11 @@ class SchemaDataCheck:
             "column": self.column,
             "constraint": self.constraint,
             "columns": list(self.columns) if self.columns else None,
+            "referenced_schema": self.referenced_schema,
+            "referenced_table": self.referenced_table,
+            "referenced_columns": list(self.referenced_columns)
+            if self.referenced_columns
+            else None,
             "evidence_ref": self.evidence_ref,
         }
         return {key: value for key, value in payload.items() if value is not None}
@@ -253,17 +261,44 @@ def _map_delta(
             [check],
         )
 
-    if delta.delta_type in {"missing_primary_key", "missing_foreign_key_constraint"}:
-        finding_type = (
-            "schema.missing_primary_key"
-            if delta.delta_type == "missing_primary_key"
-            else "schema.missing_foreign_key"
+    if delta.delta_type == "missing_foreign_key_constraint":
+        source = delta.source or {}
+        check = SchemaDataCheck(
+            check_type="orphans_after_foreign_key_relaxation",
+            schema=delta.schema,
+            table=_required_table(delta),
+            constraint=delta.constraint,
+            columns=tuple(source.get("columns", ())),
+            referenced_schema=source.get("referenced_schema"),
+            referenced_table=source.get("referenced_table"),
+            referenced_columns=tuple(source.get("referenced_columns", ())),
         )
         return (
             [
                 _finding(
                     delta,
-                    finding_type=finding_type,
+                    finding_type="schema.foreign_key_relaxed",
+                    risk_axis="migration_integrity",
+                    severity="low",
+                    gate_effect=[],
+                    base_points=10,
+                    critical_path=_is_critical(delta, critical_tables),
+                    summary=(
+                        f"Target dropped foreign key {delta.constraint}; "
+                        "row data must confirm orphaned references were not introduced."
+                    ),
+                    evidence_refs=[_evidence_ref(delta), check.evidence_ref],
+                )
+            ],
+            [check],
+        )
+
+    if delta.delta_type == "missing_primary_key":
+        return (
+            [
+                _finding(
+                    delta,
+                    finding_type="schema.missing_primary_key",
                     risk_axis="migration_integrity",
                     severity="high",
                     gate_effect=["blocks_cutover", "blocks_ready"],

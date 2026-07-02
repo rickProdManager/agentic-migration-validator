@@ -55,7 +55,10 @@ class StaticUiTest(unittest.TestCase):
     def test_dashboard_defines_human_readable_runtime_labels(self):
         app_js = (PROJECT_ROOT / "ui" / "app.js").read_text()
 
+        self.assertIn('broken_fk: "Broken Foreign Key"', app_js)
         self.assertIn('clean_migration: "Clean Migration"', app_js)
+        self.assertIn('missing_rows: "Missing Rows"', app_js)
+        self.assertIn('replication_lag: "Replication Lag"', app_js)
         self.assertIn('schema_drift: "Schema Drift"', app_js)
         self.assertIn('run_deterministic_evals: "Run Deterministic Evaluations"', app_js)
         self.assertIn('artifacts_written: "Artifacts Written"', app_js)

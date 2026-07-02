@@ -77,6 +77,29 @@ class ChecksumValidationTest(unittest.TestCase):
         self.assertEqual(finding["evidence_refs"], ["validation.checksum.public.customers.v1"])
         self.assertTrue(finding["blast_radius"]["critical_path"])
 
+    def test_target_missing_rows_are_left_to_row_presence_detector(self):
+        columns = [
+            ColumnSpec("payment_id", "integer"),
+            ColumnSpec("payment_reference", "text"),
+        ]
+
+        evidence, finding = compare_table_checksum(
+            schema="public",
+            table="payments",
+            columns=columns,
+            source_rows=[
+                {"payment_id": 5000, "payment_reference": "PAY-100"},
+                {"payment_id": 5001, "payment_reference": "PAY-101"},
+            ],
+            target_rows=[
+                {"payment_id": 5000, "payment_reference": "PAY-100"},
+            ],
+            critical_path=True,
+        )
+
+        self.assertFalse(evidence.matched)
+        self.assertIsNone(finding)
+
 
 if __name__ == "__main__":
     unittest.main()

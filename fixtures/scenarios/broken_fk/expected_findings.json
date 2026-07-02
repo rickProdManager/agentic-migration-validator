@@ -1,0 +1,72 @@
+{
+  "scenario_id": "broken_fk",
+  "model_calls": "disabled",
+  "expected_findings": [
+    {
+      "record_type": "detector_finding",
+      "risk_axis": "migration_integrity",
+      "finding_key": "validation.checksum_mismatch:public.orders:*",
+      "finding_type": "validation.checksum_mismatch",
+      "detector": "canonical_checksum",
+      "severity": "high",
+      "scope": {
+        "schema": "public",
+        "table": "orders",
+        "column": null,
+        "constraint": null,
+        "business_key": null
+      },
+      "expected_gate_effect": ["blocks_cutover", "blocks_ready"]
+    },
+    {
+      "record_type": "detector_finding",
+      "risk_axis": "migration_integrity",
+      "finding_key": "schema.foreign_key_relaxed:public.orders:orders_customer_id_fkey",
+      "finding_type": "schema.foreign_key_relaxed",
+      "detector": "schema_diff",
+      "severity": "low",
+      "scope": {
+        "schema": "public",
+        "table": "orders",
+        "column": null,
+        "constraint": "orders_customer_id_fkey",
+        "business_key": null
+      },
+      "expected_gate_effect": []
+    },
+    {
+      "record_type": "detector_finding",
+      "risk_axis": "migration_integrity",
+      "finding_key": "validation.broken_referential_integrity:public.orders:orders_customer_id_fkey",
+      "finding_type": "validation.broken_referential_integrity",
+      "detector": "schema_triggered_data_check",
+      "severity": "high",
+      "scope": {
+        "schema": "public",
+        "table": "orders",
+        "column": null,
+        "constraint": "orders_customer_id_fkey",
+        "business_key": null
+      },
+      "expected_gate_effect": ["blocks_cutover", "blocks_ready"]
+    }
+  ],
+  "expected_schema_deltas": [
+    {
+      "delta_type": "missing_foreign_key_constraint",
+      "schema": "public",
+      "table": "orders",
+      "constraint": "orders_customer_id_fkey"
+    }
+  ],
+  "expected_data_checks": [
+    {
+      "check_type": "orphans_after_foreign_key_relaxation",
+      "schema": "public",
+      "table": "orders",
+      "constraint": "orders_customer_id_fkey",
+      "orphan_count": 1
+    }
+  ],
+  "allowed_extra_findings": []
+}

@@ -1,0 +1,24 @@
+{
+  "scenario_id": "replication_lag",
+  "model_calls": "disabled",
+  "expected_findings": [
+    {
+      "record_type": "detector_finding",
+      "risk_axis": "migration_integrity",
+      "finding_key": "validation.replication_lag:public.payments:*",
+      "finding_type": "validation.replication_lag",
+      "detector": "lag_aware_row_freshness",
+      "severity": "info",
+      "scope": {
+        "schema": "public",
+        "table": "payments",
+        "column": null,
+        "constraint": null,
+        "business_key": null
+      },
+      "expected_gate_effect": [],
+      "known_cutoff": "2026-02-02T00:00:00Z"
+    }
+  ],
+  "allowed_extra_findings": []
+}

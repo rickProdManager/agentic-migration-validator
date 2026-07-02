@@ -122,6 +122,8 @@ def _run_data_checks(
             result, finding = _run_null_relaxation_check(service, check)
         elif check.check_type == "duplicates_after_unique_relaxation":
             result, finding = _run_duplicate_relaxation_check(service, check)
+        elif check.check_type == "orphans_after_foreign_key_relaxation":
+            result, finding = _run_foreign_key_relaxation_check(service, check)
         else:
             result = {
                 **check.to_dict(),
@@ -210,6 +212,63 @@ def _run_duplicate_relaxation_check(
         summary=(
             f"Target contains {duplicate_group_count} duplicate group(s) for relaxed unique "
             f"constraint {check.constraint}."
+        ),
+    )
+
+
+def _run_foreign_key_relaxation_check(
+    service: str,
+    check: SchemaDataCheck,
+) -> tuple[dict[str, Any], dict[str, Any] | None]:
+    if (
+        not check.columns
+        or not check.referenced_schema
+        or not check.referenced_table
+        or not check.referenced_columns
+        or len(check.columns) != len(check.referenced_columns)
+    ):
+        raise ValueError(f"Foreign key relaxation check is incomplete: {check!r}")
+
+    join_predicate = " AND ".join(
+        f"child.{_quote_ident(child_column)} = parent.{_quote_ident(parent_column)}"
+        for child_column, parent_column in zip(check.columns, check.referenced_columns)
+    )
+    child_present = " AND ".join(
+        f"child.{_quote_ident(child_column)} IS NOT NULL"
+        for child_column in check.columns
+    )
+    parent_missing = " AND ".join(
+        f"parent.{_quote_ident(parent_column)} IS NULL"
+        for parent_column in check.referenced_columns
+    )
+    sql = f"""
+        SELECT COUNT(*)::integer
+        FROM {_qualified_table(check.schema, check.table)} AS child
+        LEFT JOIN {_qualified_table(check.referenced_schema, check.referenced_table)} AS parent
+          ON {join_predicate}
+        WHERE {child_present}
+          AND {parent_missing};
+    """
+    orphan_count = int(_psql(service, sql))
+    result = {
+        **check.to_dict(),
+        "status": "passed" if orphan_count == 0 else "failed",
+        "passed": orphan_count == 0,
+        "orphan_count": orphan_count,
+    }
+    if orphan_count == 0:
+        return result, None
+
+    return result, _data_check_finding(
+        check,
+        finding_type="validation.broken_referential_integrity",
+        finding_key_subject=check.constraint,
+        severity="high",
+        base_points=35,
+        affected_rows=orphan_count,
+        summary=(
+            f"Target contains {orphan_count} orphaned row(s) for relaxed foreign key "
+            f"{check.constraint}."
         ),
     )
 

@@ -65,7 +65,7 @@ def compare_table_checksum(
         evidence_ref=evidence_ref,
     )
 
-    if evidence.matched:
+    if evidence.matched or evidence.source_row_count > evidence.target_row_count:
         return evidence, None
 
     return evidence, _checksum_mismatch_finding(

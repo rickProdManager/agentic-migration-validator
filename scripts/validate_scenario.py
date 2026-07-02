@@ -19,6 +19,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from tools.checksum import ColumnSpec
 from tools.checksum_validation import compare_table_checksum
+from tools.row_validation import compare_table_row_presence
 
 
 def main(argv: list[str]) -> int:
@@ -38,8 +39,18 @@ def validate_scenario(scenario_id: str) -> dict[str, Any]:
 
     for table in tables:
         columns = _fetch_columns("source-postgres", "public", table)
+        primary_key_columns = _fetch_primary_key_columns("source-postgres", "public", table)
         source_rows = _fetch_rows("source-postgres", "public", table, columns)
         target_rows = _fetch_rows("target-postgres", "public", table, columns)
+        row_evidence, row_finding = compare_table_row_presence(
+            schema="public",
+            table=table,
+            primary_key_columns=primary_key_columns,
+            source_rows=source_rows,
+            target_rows=target_rows,
+            lag_policy=_lag_policy_for_table(scenario, "public", table),
+            critical_path=table in critical_tables,
+        )
         table_evidence, finding = compare_table_checksum(
             schema="public",
             table=table,
@@ -48,7 +59,10 @@ def validate_scenario(scenario_id: str) -> dict[str, Any]:
             target_rows=target_rows,
             critical_path=table in critical_tables,
         )
+        evidence.append(row_evidence.to_dict())
         evidence.append(table_evidence.to_dict())
+        if row_finding is not None:
+            findings.append(row_finding)
         if finding is not None:
             findings.append(finding)
 
@@ -56,7 +70,7 @@ def validate_scenario(scenario_id: str) -> dict[str, Any]:
         "scenario_id": scenario_id,
         "model_calls": "disabled",
         "stage": "validation",
-        "detector": "canonical_checksum",
+        "detector": "deterministic_validation",
         "evidence": evidence,
         "findings": findings,
     }
@@ -129,6 +143,21 @@ def _fetch_rows(
     return [_coerce_row(row, columns) for row in rows]
 
 
+def _fetch_primary_key_columns(service: str, schema: str, table: str) -> list[str]:
+    sql = f"""
+        SELECT a.attname
+        FROM pg_index i
+        JOIN pg_class c ON c.oid = i.indrelid
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        JOIN pg_attribute a ON a.attrelid = c.oid AND a.attnum = ANY(i.indkey)
+        WHERE i.indisprimary
+          AND n.nspname = {_sql_literal(schema)}
+          AND c.relname = {_sql_literal(table)}
+        ORDER BY array_position(i.indkey, a.attnum);
+    """
+    return [line for line in _psql(service, sql).splitlines() if line]
+
+
 def _order_by_expression(
     service: str,
     schema: str,
@@ -167,6 +196,21 @@ def _coerce_row(row: dict[str, Any], columns: list[ColumnSpec]) -> dict[str, Any
         else:
             coerced[column.name] = value
     return coerced
+
+
+def _lag_policy_for_table(
+    scenario: dict[str, Any],
+    schema: str,
+    table: str,
+) -> dict[str, Any] | None:
+    policy = scenario.get("allowed_lag")
+    if not isinstance(policy, dict):
+        return None
+    policy_schema = str(policy.get("schema") or "public")
+    policy_table = str(policy.get("table") or "")
+    if policy_schema != schema or policy_table != table:
+        return None
+    return policy
 
 
 def _psql(service: str, sql: str) -> str:
