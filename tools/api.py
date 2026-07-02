@@ -524,7 +524,7 @@ def _read_artifact_file(
     if not artifact_path.exists():
         return error_response(
             "artifact_file_not_found",
-            f"Artifact file does not exist: {artifact_path}",
+            "Artifact file does not exist for the requested artifact. Re-run the workflow to regenerate artifact snapshots.",
             status=404,
         )
 

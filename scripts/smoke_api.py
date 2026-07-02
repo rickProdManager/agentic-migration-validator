@@ -93,6 +93,7 @@ def _run_workflow_checks(
     status, payload = request("POST", f"{base_url}/workflows/run?scenario_id={scenario}", None)
     manifest = payload.get("artifact_manifest", {})
     workflow_run_id = payload.get("workflow_run_id")
+    workflow_run_path = urllib.parse.quote(str(workflow_run_id), safe="")
     _add_check(
         checks,
         "workflow_run",
@@ -119,6 +120,20 @@ def _run_workflow_checks(
         },
     )
 
+    status, payload = request("GET", f"{base_url}/workflows/{workflow_run_path}", None)
+    _add_check(
+        checks,
+        "workflow_retrieval",
+        status == 200
+        and payload.get("workflow_run", {}).get("workflow_run_id") == workflow_run_id
+        and payload.get("workflow_run", {}).get("status") == "completed",
+        {
+            "status": status,
+            "workflow_run_id": payload.get("workflow_run", {}).get("workflow_run_id"),
+            "workflow_status": payload.get("workflow_run", {}).get("status"),
+        },
+    )
+
     status, payload = request("GET", f"{base_url}/workflows", None)
     _add_check(
         checks,
@@ -136,8 +151,7 @@ def _run_workflow_checks(
         },
     )
 
-    audit_path = urllib.parse.quote(str(workflow_run_id), safe="")
-    status, payload = request("GET", f"{base_url}/workflows/{audit_path}/audit", None)
+    status, payload = request("GET", f"{base_url}/workflows/{workflow_run_path}/audit", None)
     _add_check(
         checks,
         "workflow_audit",
@@ -154,7 +168,7 @@ def _run_workflow_checks(
     artifact_id = f"artifact.runbook_draft.{workflow_scenario}.v1"
     status, payload = request(
         "GET",
-        f"{base_url}/workflows/{audit_path}/artifacts/{urllib.parse.quote(artifact_id, safe='')}",
+        f"{base_url}/workflows/{workflow_run_path}/artifacts/{urllib.parse.quote(artifact_id, safe='')}",
         None,
     )
     _add_check(
@@ -164,7 +178,38 @@ def _run_workflow_checks(
         {"status": status, "artifact_id": payload.get("artifact_id")},
     )
 
-    approval_url = f"{base_url}/workflows/{audit_path}/approvals"
+    evidence_ref = _smoke_evidence_ref(workflow_scenario)
+    status, payload = request(
+        "GET",
+        f"{base_url}/workflows/{workflow_run_path}/evidence/{urllib.parse.quote(evidence_ref, safe='')}",
+        None,
+    )
+    _add_check(
+        checks,
+        "evidence_retrieval",
+        status == 200 and payload.get("evidence_ref") == evidence_ref,
+        {
+            "status": status,
+            "evidence_ref": payload.get("evidence_ref"),
+            "source_artifact_id": payload.get("entry", {}).get("source_artifact_id"),
+        },
+    )
+
+    approval_url = f"{base_url}/workflows/{workflow_run_path}/approvals"
+    status, payload = request("GET", approval_url, None)
+    _add_check(
+        checks,
+        "approval_initial_state",
+        status == 200
+        and payload.get("approval_count") == 0
+        and "validation_acceptance" in payload.get("pending_approvals", []),
+        {
+            "status": status,
+            "approval_count": payload.get("approval_count"),
+            "pending_count": len(payload.get("pending_approvals", [])),
+        },
+    )
+
     status, payload = request(
         "POST",
         approval_url,
@@ -201,7 +246,7 @@ def _run_workflow_checks(
         },
     )
 
-    status, payload = request("GET", f"{base_url}/workflows/{audit_path}/readiness", None)
+    status, payload = request("GET", f"{base_url}/workflows/{workflow_run_path}/readiness", None)
     scenario_results = payload.get("scenarios", [])
     first_scenario = scenario_results[0] if scenario_results else {}
     gate_results = first_scenario.get("gate_results", {})
@@ -219,23 +264,28 @@ def _run_workflow_checks(
         },
     )
 
-    if workflow_scenario == "failed_checksum":
-        evidence_ref = "validation.checksum.public.customers.v1"
-        status, payload = request(
-            "GET",
-            f"{base_url}/workflows/{audit_path}/evidence/{urllib.parse.quote(evidence_ref, safe='')}",
-            None,
-        )
-        _add_check(
-            checks,
-            "evidence_retrieval",
-            status == 200 and payload.get("evidence_ref") == evidence_ref,
-            {
-                "status": status,
-                "evidence_ref": payload.get("evidence_ref"),
-                "source_artifact_id": payload.get("entry", {}).get("source_artifact_id"),
-            },
-        )
+    status, payload = request(
+        "GET",
+        f"{base_url}/workflows/{workflow_run_path}/artifacts/{urllib.parse.quote('artifact.missing.v1', safe='')}",
+        None,
+    )
+    _add_check(
+        checks,
+        "unknown_workflow_artifact",
+        status == 404 and payload.get("error", {}).get("code") == "artifact_not_found",
+        {"status": status, "error_code": payload.get("error", {}).get("code")},
+    )
+
+
+def _smoke_evidence_ref(workflow_scenario: str) -> str:
+    known_refs = {
+        "broken_fk": "schema.data_check.orphans_after_foreign_key_relaxation.public.orders.orders_customer_id_fkey.v1",
+        "failed_checksum": "validation.checksum.public.customers.v1",
+        "missing_rows": "validation.row_presence.public.payments.v1",
+        "replication_lag": "validation.row_presence.public.payments.v1",
+        "schema_relaxed_unique_violation": "schema.data_check.duplicates_after_unique_relaxation.public.payments.payments_payment_reference_key.v1",
+    }
+    return known_refs.get(workflow_scenario, f"gate.can_mark_ready.{workflow_scenario}.v1")
 
 
 def _request_json(

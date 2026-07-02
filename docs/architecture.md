@@ -7,7 +7,7 @@ Agentic Migration Validator is a local workflow application for validating datab
 ```text
 Dependency-free local dashboard
         |
-Local JSON API / future FastAPI backend
+Dependency-free local JSON API
         |
 Workflow orchestrator
         |
@@ -30,7 +30,7 @@ The UI does not own gate state. It renders gate outputs computed by the backend.
 
 ### Backend API
 
-The backend will expose scenario setup, workflow execution, artifact retrieval, approval submission, and eval endpoints. API handlers should be thin. They load workflow state, call orchestration services, persist artifacts, and return structured response models.
+The local backend exposes scenario listing, workflow execution, workflow/run retrieval, artifact and evidence lookup, approval submission, readiness views, retries, and audit logs. API handlers are thin: they load workflow state, call orchestration services, persist artifacts, and return structured response models. A framework adapter is optional future work, not a current release requirement.
 
 ### Workflow Orchestrator
 
@@ -75,7 +75,7 @@ Implemented deterministic tools:
 - `api.py`
 - `risk_scoring.py`
 
-Future deterministic targets include broader compatibility rules, additional data validation detectors, richer runtime failure handling, and the full backend orchestration layer.
+Future deterministic targets should stay tied to explicit scenario value. Additional backend work should stabilize contracts, smoke coverage, and demo ergonomics before adding framework or streaming complexity.
 
 ### Model-Backed Advisors
 

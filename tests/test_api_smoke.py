@@ -4,6 +4,9 @@ from scripts.smoke_api import run_smoke
 
 
 class ApiSmokeTest(unittest.TestCase):
+    def setUp(self):
+        self.approval_recorded = False
+
     def test_run_smoke_checks_lightweight_routes(self):
         result = run_smoke(
             "http://api.test",
@@ -32,13 +35,16 @@ class ApiSmokeTest(unittest.TestCase):
                 "unknown_scenario",
                 "workflow_run",
                 "workflow_latest",
+                "workflow_retrieval",
                 "workflow_runs",
                 "workflow_audit",
                 "artifact_retrieval",
+                "evidence_retrieval",
+                "approval_initial_state",
                 "approval_submission",
                 "approval_retrieval",
                 "approval_aware_readiness",
-                "evidence_retrieval",
+                "unknown_workflow_artifact",
             ],
         )
 
@@ -68,6 +74,19 @@ class ApiSmokeTest(unittest.TestCase):
                     }
                 },
             )
+        if (
+            method == "GET"
+            and url == "http://api.test/workflows/workflow.fixture_validation.20260630_120000"
+        ):
+            return (
+                200,
+                {
+                    "workflow_run": {
+                        "workflow_run_id": "workflow.fixture_validation.20260630_120000",
+                        "status": "completed",
+                    }
+                },
+            )
         if method == "GET" and url == "http://api.test/workflows":
             return (
                 200,
@@ -82,6 +101,8 @@ class ApiSmokeTest(unittest.TestCase):
                     ],
                 },
             )
+        if method == "GET" and "artifact.missing.v1" in url:
+            return 404, {"error": {"code": "artifact_not_found"}}
         if method == "GET" and url.endswith("/audit"):
             return (
                 200,
@@ -93,6 +114,7 @@ class ApiSmokeTest(unittest.TestCase):
             )
         if method == "POST" and url.endswith("/approvals"):
             self.assertEqual(payload["gate"], "can_accept_validation")
+            self.approval_recorded = True
             return (
                 201,
                 {
@@ -101,6 +123,21 @@ class ApiSmokeTest(unittest.TestCase):
                 },
             )
         if method == "GET" and url.endswith("/approvals"):
+            if not self.approval_recorded:
+                return (
+                    200,
+                    {
+                        "approval_count": 0,
+                        "effective_approvals": [],
+                        "pending_approvals": [
+                            "cutover_recommendation",
+                            "final_planning",
+                            "ready",
+                            "rollback_recommendation",
+                            "validation_acceptance",
+                        ],
+                    },
+                )
             return (
                 200,
                 {
@@ -127,8 +164,6 @@ class ApiSmokeTest(unittest.TestCase):
                     ],
                 },
             )
-        if method == "GET" and "/artifacts/" in url:
-            return 200, {"artifact_id": "artifact.runbook_draft.failed_checksum.v1"}
         if method == "GET" and "/evidence/" in url:
             return (
                 200,
@@ -139,6 +174,8 @@ class ApiSmokeTest(unittest.TestCase):
                     },
                 },
             )
+        if method == "GET" and "/artifacts/" in url:
+            return 200, {"artifact_id": "artifact.runbook_draft.failed_checksum.v1"}
         raise AssertionError(f"Unexpected request: {method} {url}")
 
 

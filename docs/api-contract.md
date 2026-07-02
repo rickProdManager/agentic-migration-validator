@@ -1,8 +1,8 @@
-# Initial API Contract
+# Local API Contract
 
 The MVP backend will expose a local API for scenario setup, workflow execution, approvals, artifacts, risk reports, and evals. This document is the initial contract; endpoint names may evolve as implementation expands.
 
-The current implementation includes a local workflow response contract via `make run-workflow`, a dependency-free local JSON API via `make run-api`, and a local dashboard served from the same process with run history, launch controls, result summaries, approval inputs, and artifact/evidence/audit drilldowns. This is not the full FastAPI backend yet; it is the local surface the future backend can replace or wrap.
+The current implementation includes a local workflow response contract via `make run-workflow`, a dependency-free local JSON API via `make run-api`, and a local dashboard served from the same process with run history, launch controls, result summaries, approval inputs, and artifact/evidence/audit drilldowns. The stdlib server is the committed local backend surface; a framework adapter should only be added if a concrete demo or deployment need appears.
 
 ## Conventions
 
@@ -11,6 +11,10 @@ The current implementation includes a local workflow response contract via `make
 - Timestamps are ISO 8601 UTC strings.
 - API handlers must return computed gate state, not stored gate overrides.
 - Model-backed advisor stages must disclose when model calls were used.
+- Workflow launch is query-only; non-empty bodies are rejected before execution.
+- Retry uses the failed run's persisted `scenario_ids`; callers cannot change scenarios through a retry body.
+- Error responses use `{ "error": { "code": "...", "message": "..." } }`.
+- Runtime errors must be sanitized and must not expose local filesystem paths, exception messages, or secrets.
 
 ## Core Resources
 
@@ -296,7 +300,7 @@ Response:
   },
   "artifact_manifest": {
     "passed": true,
-    "artifact_count": 6
+    "artifact_count": 9
   },
   "run_state": {
     "passed": true,
@@ -595,7 +599,7 @@ Response:
 ```json
 {
   "passed": true,
-  "artifact_count": 6,
+  "artifact_count": 9,
   "artifacts": []
 }
 ```

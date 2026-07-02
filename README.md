@@ -133,8 +133,7 @@ Implemented capabilities:
 
 Not implemented yet:
 
-- Full FastAPI backend
-- Fuller backend workflow orchestration and async progress streaming
+- Optional framework adapter or async progress streaming if a concrete demo or deployment need appears
 - Additional bounded detector scenarios beyond the current demo-critical checksum, row-presence, lag-aware freshness, referential, schema-diff, and schema-triggered data checks
 
 ## MVP Scope

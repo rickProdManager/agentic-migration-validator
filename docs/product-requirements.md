@@ -646,9 +646,9 @@ This makes eval comparison a set operation over stable finding keys rather than 
 ### 10.1 Phase One Architecture
 
 ```text
-Vite React UI
+Local dashboard
         |
-FastAPI backend
+Local JSON API
         |
 Deterministic stages and model-backed advisors
         |
@@ -658,6 +658,8 @@ PostgreSQL source and target
         |
 JSON and Markdown artifacts
 ```
+
+The current implementation intentionally uses a dependency-free local API. A framework adapter can be added later if deployment or demo needs justify it, but framework migration is not itself a release requirement.
 
 ### 10.2 Tool Layer
 

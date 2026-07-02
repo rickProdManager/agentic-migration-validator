@@ -172,6 +172,29 @@ class ApiTest(unittest.TestCase):
         self.assertEqual(status, 404)
         self.assertEqual(response["error"]["code"], "artifact_not_found")
 
+    def test_artifact_response_sanitizes_missing_file_error(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            missing_path = root / "artifacts" / "missing.json"
+            self.write_artifact_store(
+                root,
+                manifest_artifacts=[
+                    {
+                        "artifact_id": "artifact.missing_file.v1",
+                        "path": str(missing_path),
+                        "content_hash": "sha256:abc",
+                    }
+                ],
+                files={},
+            )
+
+            status, response = artifact_response(root, "artifact.missing_file.v1")
+
+        self.assertEqual(status, 404)
+        self.assertEqual(response["error"]["code"], "artifact_file_not_found")
+        self.assertNotIn(str(root), response["error"]["message"])
+        self.assertIn("Re-run the workflow", response["error"]["message"])
+
     def test_artifact_response_rejects_paths_outside_artifact_store(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
@@ -444,6 +467,59 @@ class ApiTest(unittest.TestCase):
         self.assertEqual(status, 409)
         self.assertEqual(response["error"]["code"], "workflow_retry_not_allowed")
 
+    def test_retry_workflow_run_response_rejects_non_retryable_failure(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            failed_run = build_failed_fixture_workflow_run(
+                scenario_ids=["failed_checksum"],
+                started_at="2026-06-30T12:00:00Z",
+                completed_at="2026-06-30T12:01:00Z",
+                failed_step="run_deterministic_evals",
+                error_type="ConnectionError",
+            )
+            failed_run["failure"]["retryable"] = False
+            write_run_state(
+                root,
+                failed_run,
+                build_fixture_workflow_audit_log(failed_run),
+            )
+
+            status, response = retry_workflow_run_response(
+                root,
+                failed_run["workflow_run_id"],
+                lambda scenario_ids: failed_run,
+            )
+
+        self.assertEqual(status, 409)
+        self.assertEqual(response["error"]["code"], "workflow_retry_not_allowed")
+        self.assertIn("not marked retryable", response["error"]["message"])
+
+    def test_retry_workflow_run_response_requires_distinct_run_id(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            failed_run = build_failed_fixture_workflow_run(
+                scenario_ids=["failed_checksum"],
+                started_at="2026-06-30T12:00:00Z",
+                completed_at="2026-06-30T12:01:00Z",
+                failed_step="run_deterministic_evals",
+                error_type="ConnectionError",
+            )
+            write_run_state(
+                root,
+                failed_run,
+                build_fixture_workflow_audit_log(failed_run),
+            )
+
+            status, response = retry_workflow_run_response(
+                root,
+                failed_run["workflow_run_id"],
+                lambda scenario_ids: failed_run,
+            )
+
+        self.assertEqual(status, 500)
+        self.assertEqual(response["error"]["code"], "workflow_retry_failed")
+        self.assertIn("distinct workflow run", response["error"]["message"])
+
     def test_workflow_approvals_response_reads_approval_log(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             root = Path(tmpdir)
@@ -501,6 +577,26 @@ class ApiTest(unittest.TestCase):
 
         self.assertEqual(status, 400)
         self.assertEqual(response["error"]["code"], "invalid_approval")
+
+    def test_submit_workflow_approval_response_rejects_non_array_evidence_refs(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            workflow_run = self.write_run_store(root)
+
+            status, response = submit_workflow_approval_response(
+                root,
+                workflow_run["workflow_run_id"],
+                {
+                    "gate": "can_accept_validation",
+                    "actor": "human.reviewer",
+                    "decision": "approved",
+                    "evidence_refs": "artifact.eval_report.fixture_suite.v1",
+                },
+            )
+
+        self.assertEqual(status, 400)
+        self.assertEqual(response["error"]["code"], "invalid_approval")
+        self.assertIn("JSON array", response["error"]["message"])
 
     def test_workflow_readiness_response_recomputes_gates_from_approvals(self):
         with tempfile.TemporaryDirectory() as tmpdir:
