@@ -10,6 +10,12 @@ The core design principle is:
 
 Model-backed advisors may explain, summarize, and draft runbook guidance. They do not decide whether a migration is safe. Database inspection, checksum validation, schema checks, evidence validation, risk scoring, approvals, and safety gates remain deterministic.
 
+## Why I Built This
+
+After 15 years building enterprise database migration suites, I built this project to make a specific architectural point concrete: migration safety should not depend on model confidence or persuasive prose.
+
+Database migrations fail in the details: a row count matches but a value changed, a constraint was relaxed but the data still behaves correctly, a missing row is either unexplained loss or expected replication lag. Those distinctions require deterministic evidence, explicit policy, and auditable human decisions. Agentic systems can help teams understand and act on that evidence, but the system should still make safety boundaries enforceable in code.
+
 ## Why This Exists
 
 A migration validation system should not ask an LLM, "Is this safe to cut over?"
