@@ -21,10 +21,18 @@ Agentic Migration Validator is a migration-readiness workflow where model-backed
 
 The key safety boundary is that advisors propose, deterministic invariants dispose. If a checksum mismatch, schema-triggered data violation, unresolved evidence reference, or missing approval blocks readiness, the UI can explain it and record human inputs, but it cannot edit the gate result directly.
 
+Lead with the row-gap contrast, because it explains the architecture faster than a feature tour:
+
+- `Missing Rows` and `Replication Lag` use the same missing target payment row.
+- `Missing Rows` blocks readiness because the row loss is unexplained.
+- `Replication Lag` stays non-blocking because a declared source freshness cutoff explains the gap.
+
+That is the thesis in one example: the system is not asking an LLM whether the migration feels safe. Deterministic evidence and policy make the cutover decision; advisor prose is allowed only behind that boundary.
+
 ## Dashboard Walkthrough
 
 1. Start with the `New Run` panel.
-2. Select `Failed Checksum`.
+2. Select `Missing Rows`.
 3. Run the workflow.
 4. Point out that the newly persisted run is selected automatically.
 5. In `Run Result`, show the completed workflow summary.
@@ -34,11 +42,12 @@ The key safety boundary is that advisors propose, deterministic invariants dispo
    - Validate Artifact Bundle
    - Write Artifact Bundle
 7. In `Stage Transitions`, show that stage movement is explicitly checked.
-8. In `Readiness Gates`, show that readiness is blocked by deterministic findings.
-9. In `Run Artifacts`, open the runbook draft.
-10. In `Evidence Reference`, show that runbook claims resolve back to artifact/evidence entries.
-11. In `Approval Action`, submit a validation approval.
-12. In `Audit Trail`, show that the approval was appended as an audit event.
+8. In `Readiness Gates`, show that readiness is blocked by the deterministic missing-row finding.
+9. Run `Replication Lag` and point out that it uses the same missing target row but stays non-blocking because policy evidence explains the gap.
+10. In `Run Artifacts`, open the runbook draft.
+11. In `Evidence Reference`, show that runbook claims resolve back to artifact/evidence entries.
+12. In `Approval Action`, submit a validation approval.
+13. In `Audit Trail`, show that the approval was appended as an audit event.
 
 The important point: approval submission changes persisted inputs and audit state. It does not directly edit readiness gates. Gates recompute from findings plus approval state.
 
@@ -80,10 +89,16 @@ Then compare:
 To prove gates are enforced as a hard stop:
 
 ```sh
-make enforce-gate SCENARIO=failed_checksum GATE=can_mark_ready
+make enforce-gate SCENARIO=missing_rows GATE=can_mark_ready
 ```
 
-That command exits nonzero because deterministic readiness is blocked.
+That command exits nonzero because deterministic readiness is blocked. Then run:
+
+```sh
+make enforce-gate SCENARIO=replication_lag GATE=can_mark_ready
+```
+
+That command exits successfully because the same row gap is explained by the scenario's freshness policy.
 
 ## Closing Line
 

@@ -368,7 +368,9 @@ function ensureLaunchSelection() {
     knownScenarioIds.includes(scenarioId),
   );
   if (!state.launchScenarioIds.length && knownScenarioIds.length) {
-    state.launchScenarioIds = [knownScenarioIds[0]];
+    state.launchScenarioIds = [
+      knownScenarioIds.includes("missing_rows") ? "missing_rows" : knownScenarioIds[0],
+    ];
   }
 }
 
@@ -857,7 +859,7 @@ function renderFindings(scenario) {
             <span class="pill blocked">Blocking</span>
           </div>
           <div class="finding-meta">Blocks: ${escapeHtml(impactedGates.map((gate) => gateLabels[gate] || gate).join(", ") || "-")}</div>
-          <div class="finding-meta">Finding key: ${escapeHtml(findingKey)}</div>
+          <div class="finding-meta">Finding type: ${escapeHtml(findingTypeLabel(findingKey))}</div>
         </article>
       `;
     })
@@ -1771,6 +1773,15 @@ function findingLabel(value) {
     return titleCase(type);
   }
   return `${titleCase(type)} - ${scope.map(scopeLabel).join(" / ")}`;
+}
+
+function findingTypeLabel(value) {
+  if (!value) {
+    return "-";
+  }
+  const [familyAndType] = String(value).split(":");
+  const type = familyAndType.split(".").slice(1).join("_") || familyAndType;
+  return titleCase(type);
 }
 
 function scopeLabel(value) {

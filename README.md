@@ -4,9 +4,14 @@ Agentic Migration Validator is a local workflow for assessing database migration
 
 The core product idea is simple: advisors propose, deterministic invariants dispose. Model-backed advisors may synthesize plans, explanations, critiques, and runbooks, but database inspection, validation checks, risk scoring, evidence validation, and safety gates are deterministic.
 
+The project is built around a concrete migration problem: the same symptom can require different cutover decisions depending on evidence. In the fixture suite, `missing_rows` and `replication_lag` share the same missing target payment row. One blocks readiness because the row loss is unexplained; the other stays non-blocking because a declared freshness cutoff explains the gap. A model can narrate that result, but the deterministic gate makes the decision.
+
+This is the architectural argument: do not ask an LLM whether a migration is safe. Make deterministic tools produce evidence, make gates enforce the safety policy, and let advisors explain only what those facts support.
+
 ## What It Demonstrates
 
 - PostgreSQL source/target fixture validation with deterministic checksum and schema checks.
+- Policy-aware validation where the same row gap can either block readiness or remain an explained lag condition.
 - Structured findings separated across `migration_integrity`, `compatibility_advisory`, and `process_control` risk axes.
 - Gatekeeper decisions that enforce cutover/readiness instead of asking an advisor to decide safety.
 - Evidence-bound runbook drafts whose claims must trace back to deterministic findings and gate results.
@@ -81,20 +86,23 @@ The dashboard is dependency-free and served by the same local API process. Gener
 
 Use this path when showing the project to a reviewer:
 
-1. In `New Run`, select `Failed Checksum`, then run the workflow.
-2. Confirm the new run is selected in `Runs`.
-3. Inspect `Run Result`, `Workflow Progress`, and `Stage Transitions`.
-4. Open `Readiness Gates` and verify cutover/readiness are blocked by deterministic findings.
+1. In `New Run`, select `Missing Rows`, then run the workflow.
+2. Open `Readiness Gates` and verify readiness is blocked by `validation.missing_rows`.
+3. Run `Replication Lag`, which uses the same missing target payment row.
+4. Verify the lag scenario stays non-blocking because the source freshness cutoff explains the gap.
 5. Open `Run Artifacts`, choose the runbook draft, and inspect its evidence references.
 6. Submit a validation approval in `Approval Action`.
 7. Confirm `Approval State` and `Audit Trail` update while gate decisions remain derived state.
+
+That contrast is the fastest way to read the system: same data symptom, different verdict, because deterministic evidence and policy decide. The advisor explains the result; it does not decide safety.
 
 For the schema-risk contrast, launch or inspect:
 
 - `Schema Drift`: dropped uniqueness remains a low structural note when row data still satisfies uniqueness.
 - `Relaxed Unique Violation`: the same relaxed uniqueness becomes a high blocking finding when row data contains duplicates.
+- `Broken Foreign Key`: dropped referential integrity becomes blocking when target rows contain orphaned references.
 
-That contrast is the central thesis of the project: metadata identifies where a verdict is needed, row data determines whether migration integrity is actually broken, and gates own the safety decision.
+These scenarios show the same pattern from another angle: metadata identifies where a verdict is needed, row data determines whether migration integrity is actually broken, and gates own the safety decision.
 
 ## Current Status
 

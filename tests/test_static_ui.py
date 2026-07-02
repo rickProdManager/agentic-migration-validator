@@ -64,6 +64,10 @@ class StaticUiTest(unittest.TestCase):
         self.assertIn('artifacts_written: "Artifacts Written"', app_js)
         self.assertIn("function scenarioLabel", app_js)
         self.assertIn("function evidenceLabel", app_js)
+        self.assertIn("function findingTypeLabel", app_js)
+        self.assertIn('knownScenarioIds.includes("missing_rows") ? "missing_rows"', app_js)
+        self.assertIn("Finding type:", app_js)
+        self.assertNotIn("Finding key:", app_js)
 
     def test_dashboard_defines_operator_error_prevention_affordances(self):
         app_js = (PROJECT_ROOT / "ui" / "app.js").read_text()

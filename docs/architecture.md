@@ -4,6 +4,8 @@
 
 Agentic Migration Validator is a local workflow application for validating database migration readiness. The phase-one architecture keeps deterministic tooling in charge of facts, checks, scoring, and safety gates while reserving model-backed advisors for synthesis and review.
 
+The architecture exists because migration safety is not a prose problem. For example, `missing_rows` and `replication_lag` share the same missing target row, but one blocks readiness and the other does not because a declared freshness cutoff changes the policy verdict. That decision belongs to deterministic evidence and gates; an advisor may explain it, but it cannot make or override it.
+
 ```text
 Dependency-free local dashboard
         |
