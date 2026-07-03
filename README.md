@@ -2,7 +2,7 @@
 
 Agentic Migration Validator is a local, credentials-free workflow for checking whether a PostgreSQL migration is safe to promote.
 
-It compares source and target databases, produces structured findings, enforces deterministic readiness gates, persists audit-ready workflow state, and drafts runbook guidance that must stay tied to evidence.
+It compares source and target databases, produces structured findings, enforces readiness gates, persists audit-ready workflow state, and drafts runbook guidance that must stay tied to evidence.
 
 The core design principle is:
 
@@ -34,11 +34,11 @@ Same symptom, different verdict. The model may narrate the result, but the deter
 
 ## What It Demonstrates
 
-- PostgreSQL source/target fixture validation with deterministic checksum and schema checks.
+- PostgreSQL source/target fixture validation with checksum and schema checks.
 - Policy-aware validation where the same row gap can either block readiness or remain an explained lag condition.
 - Structured findings across `migration_integrity`, `compatibility_advisory`, and `process_control` risk axes.
 - Gatekeeper decisions that enforce cutover/readiness instead of asking an advisor to decide safety.
-- Evidence-bound runbook drafts whose claims must trace back to deterministic findings and gate results.
+- Evidence-bound runbook drafts whose claims must trace back to findings and gate results.
 - A local dashboard that launches workflow runs, persists audit-ready state, records approvals, and resolves artifact/evidence details.
 
 ## Who It Is For
@@ -223,7 +223,7 @@ Run raw schema diff introspection:
 make schema-diff SCENARIO=schema_drift
 ```
 
-Run all deterministic fixture evals:
+Run all fixture evals:
 
 ```sh
 make eval-scenarios
